@@ -309,6 +309,15 @@
   .suggest-history-item .meta{ font-size:12px; color:var(--muted); font-weight:400; }
   .suggest-history-item .body{ margin-top:8px; font-size:13.5px; color:var(--text); white-space:pre-wrap; line-height:1.5; }
 
+  /* MANUAL MACRO ENTRY */
+  .macro-input-row{ display:flex; gap:8px; margin:10px 0; }
+  .macro-input{ flex:1; }
+  .macro-input label{ display:block; font-size:10px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); margin-bottom:4px; }
+  .macro-input input{
+    width:100%; background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    padding:9px 8px; border-radius:9px; font-family:var(--font-body); font-size:14px; text-align:center;
+  }
+
   .toast{
     position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(20px);
     background:var(--surface-2); border:1px solid var(--line); color:var(--text);
@@ -360,12 +369,25 @@
     <div class="card" id="mealsCard" style="display:none;">
       <h2>Meals Today</h2>
       <div class="macro-summary" id="macroSummary"></div>
+      <p class="disclaimer" style="margin-top:0; margin-bottom:14px;">Ask Claude in a separate chat to estimate calories/macros from a meal photo, then log the numbers here.</p>
+
       <label class="add-meal-label" id="addMealLabel">
-        📷 Snap a Meal Photo
+        📷 Attach Photo (optional)
         <input type="file" accept="image/*" id="mealInput" style="display:none;">
       </label>
-      <div id="mealsList"></div>
-      <p class="disclaimer">Estimates from photo analysis — meant to be generally right, not lab-precise. Use judgment for anything with allergies or strict medical needs.</p>
+      <div id="mealPhotoPreview"></div>
+
+      <input type="text" class="suggest-input" id="mealDesc" placeholder="What was it? (e.g. Chicken bowl)">
+      <div class="macro-input-row">
+        <div class="macro-input"><label>Calories</label><input type="number" inputmode="numeric" id="mealCalories" placeholder="0"></div>
+        <div class="macro-input"><label>Protein g</label><input type="number" inputmode="numeric" id="mealProtein" placeholder="0"></div>
+        <div class="macro-input"><label>Carbs g</label><input type="number" inputmode="numeric" id="mealCarbs" placeholder="0"></div>
+        <div class="macro-input"><label>Fat g</label><input type="number" inputmode="numeric" id="mealFat" placeholder="0"></div>
+      </div>
+      <textarea id="mealNote" placeholder="Notes (optional) — e.g. what Claude said about this meal"></textarea>
+      <button class="btn btn-primary" id="saveMealBtn" style="margin-top:10px;">Save Meal</button>
+
+      <div id="mealsList" style="margin-top:6px;"></div>
     </div>
   </div>
 
@@ -395,7 +417,7 @@
     <div class="card">
       <h2>Your Diet Rules</h2>
       <textarea id="dietRulesInput" placeholder="e.g. no added sugar, no fried food, lean protein at every meal, no bread"></textarea>
-      <p class="disclaimer">Optional — this gets used to personalize the restaurant suggestions in the Suggest tab.</p>
+      <p class="disclaimer">Optional — keep this handy to reference when you ask Claude for a restaurant recommendation in a separate chat.</p>
     </div>
     <div class="card" id="refCard">
       <h2>Quick Pick List</h2>
@@ -407,16 +429,16 @@
   <div class="view" id="view-suggest">
     <div class="card">
       <h2>Restaurant Suggestion</h2>
+      <p class="disclaimer" style="margin-top:0; margin-bottom:14px;">Ask Claude in a separate chat what to order at a specific restaurant, then paste the answer here to keep a record.</p>
       <input type="text" class="suggest-input" id="suggestRestaurant" placeholder="Restaurant name (e.g. Chipotle, Torchy's Tacos)">
-      <input type="text" class="suggest-input" id="suggestLocation" placeholder="City/area (optional, helps find the right menu)">
-      <input type="text" class="suggest-input" id="suggestCraving" placeholder="Craving anything specific? (optional)">
+      <input type="text" class="suggest-input" id="suggestLocation" placeholder="City/area (optional)">
       <label class="add-meal-label" id="menuPhotoLabel">
-        📋 Attach Menu Photo <span style="opacity:0.7;">(if I can't find it online)</span>
+        📋 Attach Menu Photo (optional)
         <input type="file" accept="image/*" id="menuPhotoInput" style="display:none;">
       </label>
       <div id="menuPhotoPreview"></div>
-      <button class="btn btn-primary" id="suggestBtn">Get Recommendation</button>
-      <div id="suggestResult"></div>
+      <textarea id="suggestPasteArea" placeholder="Paste what Claude suggested (or your own notes on what to order)"></textarea>
+      <button class="btn btn-primary" id="saveSuggestBtn" style="margin-top:10px;">Save to History</button>
     </div>
     <div class="card">
       <h2>Past Suggestions</h2>
@@ -1070,69 +1092,82 @@ async function saveMealsForDay(dayIndex, meals){
   }
 }
 
-const MEAL_PROMPT = `You're estimating nutrition from a photo of a meal for a personal diet tracker. Respond with ONLY a raw JSON object, no markdown fences, no preamble, matching exactly this shape:
-{"description": "short 3-6 word description of the food", "calories": integer, "protein_g": integer, "carbs_g": integer, "fat_g": integer, "wellness_note": "one short plain sentence on how this fits a generally healthy diet (whole foods vs processed, balance, portion)", "confidence": "low" | "medium" | "high"}
-Give your best reasonable estimate based on typical portion sizes and standard ingredients visible in the photo, even under uncertainty. Do not refuse or hedge — always return your best numeric estimate. If the image doesn't show food, still return the JSON shape with description "not food" and zeros.`;
+let pendingMealPhoto = null;
 
-async function analyzeMealPhoto(dataUrl){
-  const base64 = dataUrl.split(',')[1];
-  const response = await fetch("/.netlify/functions/claude-proxy", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 400,
-      messages: [{
-        role: "user",
-        content: [
-          { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64 } },
-          { type: "text", text: MEAL_PROMPT }
-        ]
-      }]
-    })
-  });
-  const data = await response.json();
-  const textBlock = (data.content || []).find(b => b.type === 'text');
-  if(!textBlock) throw new Error('No analysis returned');
-  const cleaned = textBlock.text.replace(/```json|```/g, '').trim();
-  return JSON.parse(cleaned);
-}
-
-async function handleMealPhotoSelect(e){
+async function handleMealPhotoAttach(e){
   const file = e.target.files[0];
   if(!file) return;
   const label = document.getElementById('addMealLabel');
   label.classList.add('busy');
-  label.firstChild.textContent = '⏳ Analyzing photo…';
   try{
-    const dataUrl = await compressImage(file, 700, 0.6);
-    const analysis = await analyzeMealPhoto(dataUrl);
-    const meal = {
-      id: Date.now().toString(36),
-      time: new Date().toTimeString().slice(0,5),
-      photo: dataUrl,
-      description: analysis.description || 'Meal',
-      calories: Number(analysis.calories) || 0,
-      protein_g: Number(analysis.protein_g) || 0,
-      carbs_g: Number(analysis.carbs_g) || 0,
-      fat_g: Number(analysis.fat_g) || 0,
-      wellness_note: analysis.wellness_note || '',
-      confidence: analysis.confidence || 'medium',
-    };
-    const dayIndex = state.currentDayIndex;
-    const meals = await loadMealsForDay(dayIndex);
-    meals.push(meal);
-    await saveMealsForDay(dayIndex, meals);
-    showToast('Meal logged');
+    pendingMealPhoto = await compressImage(file, 700, 0.6);
+    renderMealPhotoPreview();
   }catch(err){
     console.error(err);
-    showToast("Couldn't read that photo — try a clearer shot");
+    showToast("Couldn't read that photo");
   }finally{
     label.classList.remove('busy');
-    label.firstChild.textContent = '📷 Snap a Meal Photo';
     e.target.value = '';
-    renderMeals();
   }
+}
+
+function clearMealPhoto(){
+  pendingMealPhoto = null;
+  renderMealPhotoPreview();
+}
+
+function renderMealPhotoPreview(){
+  const container = document.getElementById('mealPhotoPreview');
+  if(!pendingMealPhoto){ container.innerHTML = ''; return; }
+  container.innerHTML = `
+    <div class="photo-zone">
+      <img src="${pendingMealPhoto}" class="photo-thumb">
+      <div class="photo-actions">
+        <button class="btn btn-ghost photo-btn" id="removeMealPhotoBtn">Remove Photo</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('removeMealPhotoBtn').addEventListener('click', clearMealPhoto);
+}
+
+async function handleSaveMeal(){
+  const desc = document.getElementById('mealDesc').value.trim();
+  const calories = Number(document.getElementById('mealCalories').value) || 0;
+  const protein = Number(document.getElementById('mealProtein').value) || 0;
+  const carbs = Number(document.getElementById('mealCarbs').value) || 0;
+  const fat = Number(document.getElementById('mealFat').value) || 0;
+  const note = document.getElementById('mealNote').value.trim();
+
+  if(!desc && !calories && !protein && !carbs && !fat){
+    showToast('Add a description or at least one number first');
+    return;
+  }
+
+  const meal = {
+    id: Date.now().toString(36),
+    time: new Date().toTimeString().slice(0,5),
+    photo: pendingMealPhoto || null,
+    description: desc || 'Meal',
+    calories, protein_g: protein, carbs_g: carbs, fat_g: fat,
+    wellness_note: note,
+  };
+
+  const dayIndex = state.currentDayIndex;
+  const meals = await loadMealsForDay(dayIndex);
+  meals.push(meal);
+  await saveMealsForDay(dayIndex, meals);
+
+  // reset form
+  document.getElementById('mealDesc').value = '';
+  document.getElementById('mealCalories').value = '';
+  document.getElementById('mealProtein').value = '';
+  document.getElementById('mealCarbs').value = '';
+  document.getElementById('mealFat').value = '';
+  document.getElementById('mealNote').value = '';
+  clearMealPhoto();
+
+  showToast('Meal logged');
+  renderMeals();
 }
 
 async function deleteMeal(dayIndex, mealId){
@@ -1169,7 +1204,7 @@ async function renderMeals(){
       const row = document.createElement('div');
       row.className = 'meal-item';
       row.innerHTML = `
-        <img src="${m.photo}" class="meal-thumb">
+        ${m.photo ? `<img src="${m.photo}" class="meal-thumb">` : '<div class="meal-thumb" style="display:flex;align-items:center;justify-content:center;font-size:20px;">🍽️</div>'}
         <div class="meal-body">
           <div class="meal-desc">${m.description} <span style="color:var(--muted); font-weight:400;">· ${m.time}</span></div>
           <div class="meal-macros"><b>${m.calories}</b> cal &nbsp; <b>${m.protein_g}g</b> protein &nbsp; <b>${m.carbs_g}g</b> carb &nbsp; <b>${m.fat_g}g</b> fat</div>
@@ -1322,51 +1357,6 @@ function renderMenuPhotoPreview(){
   document.getElementById('removeMenuPhotoBtn').addEventListener('click', clearMenuPhoto);
 }
 
-const SUGGEST_PROMPT_HEADER = `You're helping someone stick to a strict health challenge: no alcohol, zero cheat meals, whole foods, lean protein, minimal fried food or added sugar. Give practical, specific ordering advice, not generic diet talk.`;
-
-async function getRestaurantSuggestion(restaurant, location, craving, dietRules, menuPhotoDataUrl){
-  const basePrompt = `${SUGGEST_PROMPT_HEADER}
-${dietRules ? 'Their specific diet notes: ' + dietRules : ''}
-They're eating at: "${restaurant}"${location ? ' in ' + location : ''}.
-${craving ? 'They are in the mood for: ' + craving : ''}`;
-
-  let messageContent;
-  let tools;
-
-  if(menuPhotoDataUrl){
-    const base64 = menuPhotoDataUrl.split(',')[1];
-    messageContent = [
-      { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64 } },
-      { type: "text", text: `${basePrompt}
-
-Here is an actual photo of this restaurant's menu. Read it directly and recommend 2-3 specific items from what's actually on it that best fit the diet, with a one-line reason for each. Then flag 1-2 items to skip or a swap to ask for. Keep it tight — under 150 words, plain text, no markdown headers or asterisks.` }
-    ];
-  } else {
-    messageContent = `${basePrompt}
-
-Search for this restaurant's actual menu if you can find it. Recommend 2-3 specific menu items that best fit the diet, with a one-line reason for each (protein content, avoiding fried/sugar/sauce, etc). Then flag 1-2 things on the menu to skip or a swap to ask for. If you can't find the exact menu, give a general ordering strategy for this type of restaurant or cuisine instead. Keep it tight — under 150 words, plain text, no markdown headers or asterisks.`;
-    tools = [{ type: "web_search_20250305", name: "web_search" }];
-  }
-
-  const body = {
-    model: "claude-sonnet-4-6",
-    max_tokens: 600,
-    messages: [{ role: "user", content: messageContent }],
-  };
-  if(tools) body.tools = tools;
-
-  const response = await fetch("/.netlify/functions/claude-proxy", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
-  const data = await response.json();
-  const textBlocks = (data.content || []).filter(b => b.type === 'text').map(b => b.text);
-  const combined = textBlocks.join('\n').trim();
-  if(!combined) throw new Error('No suggestion returned');
-  return combined;
-}
-
 async function loadSuggestHistory(){
   try{
     const res = await window.storage.get('suggestHistory');
@@ -1378,40 +1368,29 @@ async function saveSuggestHistory(list){
   try{ await window.storage.set('suggestHistory', JSON.stringify(list.slice(0, 20))); }catch(e){ console.error(e); }
 }
 
-async function handleGetSuggestion(){
+async function handleSaveSuggestion(){
   const restaurant = document.getElementById('suggestRestaurant').value.trim();
   const location = document.getElementById('suggestLocation').value.trim();
-  const craving = document.getElementById('suggestCraving').value.trim();
+  const pasted = document.getElementById('suggestPasteArea').value.trim();
+
   if(!restaurant){ showToast('Enter a restaurant name first'); return; }
+  if(!pasted){ showToast('Paste in what Claude suggested first'); return; }
 
-  const btn = document.getElementById('suggestBtn');
-  const resultBox = document.getElementById('suggestResult');
-  btn.disabled = true;
-  btn.textContent = 'Looking that up…';
-  resultBox.innerHTML = '';
+  const history = await loadSuggestHistory();
+  history.unshift({
+    restaurant, location, suggestion: pasted,
+    menuPhoto: currentMenuPhoto || null,
+    timestamp: new Date().toISOString()
+  });
+  await saveSuggestHistory(history);
 
-  try{
-    const dietRules = await loadDietRules();
-    const usedPhoto = currentMenuPhoto;
-    const suggestion = await getRestaurantSuggestion(restaurant, location, craving, dietRules, usedPhoto);
-    resultBox.innerHTML = `<div class="suggest-result">${suggestion}</div>`;
+  document.getElementById('suggestRestaurant').value = '';
+  document.getElementById('suggestLocation').value = '';
+  document.getElementById('suggestPasteArea').value = '';
+  clearMenuPhoto();
 
-    const history = await loadSuggestHistory();
-    history.unshift({
-      restaurant, location, craving, suggestion,
-      menuPhoto: usedPhoto || null,
-      timestamp: new Date().toISOString()
-    });
-    await saveSuggestHistory(history);
-    clearMenuPhoto();
-    renderSuggestHistory();
-  }catch(err){
-    console.error(err);
-    resultBox.innerHTML = `<div class="suggest-result">Couldn't get a suggestion just now — try again in a moment.</div>`;
-  }finally{
-    btn.disabled = false;
-    btn.textContent = 'Get Recommendation';
-  }
+  showToast('Saved to history');
+  renderSuggestHistory();
 }
 
 async function renderSuggestHistory(){
@@ -1532,7 +1511,7 @@ async function openDayDetail(dayIndex){
     meals.forEach(m => {
       html += `
         <div class="meal-item">
-          <img src="${m.photo}" class="meal-thumb">
+          ${m.photo ? `<img src="${m.photo}" class="meal-thumb">` : '<div class="meal-thumb" style="display:flex;align-items:center;justify-content:center;font-size:20px;">🍽️</div>'}
           <div class="meal-body">
             <div class="meal-desc">${m.description} <span style="color:var(--muted); font-weight:400;">· ${m.time}</span></div>
             <div class="meal-macros"><b>${m.calories}</b> cal &nbsp; <b>${m.protein_g}g</b> protein &nbsp; <b>${m.carbs_g}g</b> carb &nbsp; <b>${m.fat_g}g</b> fat</div>
@@ -1580,8 +1559,9 @@ async function init(){
   });
   document.getElementById('resetConfirmBtn').addEventListener('click', performReset);
   document.getElementById('wipeBtn').addEventListener('click', wipeAll);
-  document.getElementById('mealInput').addEventListener('change', handleMealPhotoSelect);
-  document.getElementById('suggestBtn').addEventListener('click', handleGetSuggestion);
+  document.getElementById('mealInput').addEventListener('change', handleMealPhotoAttach);
+  document.getElementById('saveMealBtn').addEventListener('click', handleSaveMeal);
+  document.getElementById('saveSuggestBtn').addEventListener('click', handleSaveSuggestion);
   document.getElementById('menuPhotoInput').addEventListener('change', handleMenuPhotoSelect);
   document.getElementById('dayDetailClose').addEventListener('click', closeDayDetail);
   document.getElementById('dayDetailModal').addEventListener('click', (e) => {
