@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>75 HARD // TRACKER</title>
+<meta name="theme-color" content="#ff5029">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="75 Hard">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #101113;
+    --surface: #1a1c1e;
+    --surface-2: #232629;
+    --line: #2d3033;
+    --text: #f2f0ec;
+    --muted: #8b8f94;
+    --ember: #ff5029;
+    --ember-dim: #7a2a19;
+    --done: #3ecf6e;
+    --done-dim: #1f4a30;
+    --danger: #e6394a;
+    --font-display: 'Oswald', sans-serif;
+    --font-body: 'Inter', sans-serif;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    min-height:100vh;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wrap{ max-width:720px; margin:0 auto; padding:20px 16px 80px; }
+
+  /* HEADER */
+  header{ margin-bottom:22px; }
+  .brand{
+    font-family:var(--font-display);
+    font-weight:700;
+    letter-spacing:0.14em;
+    font-size:13px;
+    color: var(--ember);
+    text-transform:uppercase;
+    margin:0 0 4px;
+  }
+  .big-count{
+    display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+  }
+  .big-count .num{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:64px;
+    line-height:0.9;
+    letter-spacing:-0.01em;
+  }
+  .big-count .of{
+    font-family:var(--font-display);
+    font-size:20px;
+    color:var(--muted);
+    font-weight:500;
+  }
+  .subline{ color:var(--muted); font-size:13px; margin-top:6px; }
+  .subline b{ color:var(--text); }
+
+  /* TABS */
+  .tabs{ display:flex; gap:6px; margin:18px 0 16px; background:var(--surface); padding:4px; border-radius:12px; border:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
+  .tabs::-webkit-scrollbar{ display:none; }
+  .tab{
+    flex:0 0 auto; text-align:center; padding:10px 14px; border-radius:9px;
+    font-family:var(--font-display); font-size:13px; letter-spacing:0.06em;
+    text-transform:uppercase; font-weight:500; color:var(--muted); white-space:nowrap;
+    cursor:pointer; user-select:none; transition:all .15s ease;
+  }
+  .tab.active{ background:var(--surface-2); color:var(--text); }
+
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  /* SETUP CARD */
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:18px;
+    margin-bottom:14px;
+  }
+  .card h2{
+    font-family:var(--font-display);
+    font-size:14px; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--muted); margin:0 0 14px; font-weight:600;
+  }
+  .btn{
+    font-family:var(--font-display);
+    text-transform:uppercase; letter-spacing:0.06em; font-weight:600;
+    font-size:14px;
+    border:none; border-radius:11px; padding:14px 18px;
+    cursor:pointer; width:100%;
+    transition: transform .1s ease, opacity .15s ease;
+  }
+  .btn:active{ transform:scale(0.98); }
+  .btn-primary{ background:var(--ember); color:#1a0d08; }
+  .btn:disabled{ opacity:0.4; cursor:not-allowed; }
+  .btn-primary:disabled{ background:var(--surface-2); color:var(--muted); cursor:not-allowed; }
+  .btn-ghost{ background:transparent; color:var(--muted); border:1px solid var(--line); }
+  .btn-danger{ background:transparent; color:var(--danger); border:1px solid var(--danger); }
+  input[type="date"]{
+    width:100%; background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    padding:12px; border-radius:10px; font-family:var(--font-body); font-size:15px; margin-bottom:12px;
+    color-scheme: dark;
+  }
+
+  /* CHECKLIST */
+  .task{
+    display:flex; align-items:flex-start; gap:12px;
+    padding:14px 4px; border-bottom:1px solid var(--line);
+  }
+  .task:last-child{ border-bottom:none; }
+  .checkbox{
+    flex-shrink:0; width:26px; height:26px; border-radius:8px;
+    border:2px solid var(--line); background:var(--surface-2);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; margin-top:2px; transition: all .15s ease;
+  }
+  .checkbox.checked{ background:var(--done); border-color:var(--done); }
+  .checkbox svg{ width:15px; height:15px; opacity:0; transition:opacity .1s ease; }
+  .checkbox.checked svg{ opacity:1; }
+  .task-body{ flex:1; }
+  .task-label{ font-size:15px; font-weight:600; line-height:1.3; }
+  .task-sub{ font-size:12.5px; color:var(--muted); margin-top:2px; }
+  .task.done .task-label{ color:var(--muted); text-decoration:line-through; text-decoration-color:var(--line); }
+
+  .water-row{ display:flex; align-items:center; gap:10px; margin-top:8px; }
+  .water-track{ flex:1; height:10px; background:var(--surface-2); border-radius:6px; overflow:hidden; }
+  .water-fill{ height:100%; background:var(--ember); transition:width .2s ease; }
+  .stepper{ display:flex; align-items:center; gap:8px; }
+  .stepper button{
+    width:30px; height:30px; border-radius:8px; border:1px solid var(--line);
+    background:var(--surface-2); color:var(--text); font-size:16px; cursor:pointer;
+  }
+  .water-amt{ font-family:var(--font-display); font-size:14px; min-width:56px; text-align:center; }
+  .water-inc-row{ display:flex; gap:6px; margin-top:10px; }
+  .water-inc-btn{
+    flex:1; text-align:center; padding:6px 4px; border-radius:8px;
+    border:1px solid var(--line); background:var(--surface-2); color:var(--muted);
+    font-family:var(--font-display); font-size:12px; letter-spacing:0.03em;
+    cursor:pointer; transition:all .12s ease;
+  }
+  .water-inc-btn.active{ background:var(--ember); color:#1a0d08; border-color:var(--ember); font-weight:600; }
+
+  /* DAY DETAIL MODAL */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.72); z-index:100;
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .modal-overlay.show{ display:flex; }
+  .modal-sheet{
+    background:var(--surface); border:1px solid var(--line); border-bottom:none;
+    border-top-left-radius:20px; border-top-right-radius:20px;
+    max-width:720px; width:100%; max-height:85vh; overflow-y:auto;
+    padding:20px 18px 28px;
+  }
+  .modal-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .modal-header h2{
+    font-family:var(--font-display); font-size:18px; text-transform:uppercase;
+    letter-spacing:0.05em; margin:0; font-weight:600;
+  }
+  .modal-close{
+    background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    width:30px; height:30px; border-radius:8px; font-size:16px; cursor:pointer;
+  }
+  .detail-row{ display:flex; align-items:center; gap:8px; padding:6px 0; font-size:14px; }
+  .detail-note{
+    background:var(--surface-2); border:1px solid var(--line); border-radius:10px;
+    padding:10px 12px; font-size:13px; font-style:italic; color:var(--muted); margin-top:10px;
+  }
+  .detail-subhead{
+    font-family:var(--font-display); font-size:12px; letter-spacing:0.06em; text-transform:uppercase;
+    color:var(--ember); margin:18px 0 6px; font-weight:600;
+  }
+  .confirm-input{
+    width:100%; background:var(--surface-2); border:1px solid var(--danger); color:var(--text);
+    padding:12px; border-radius:10px; font-family:var(--font-body); font-size:16px;
+    text-align:center; text-transform:uppercase; letter-spacing:0.1em; margin:14px 0;
+  }
+  .modal-btn-row{ display:flex; gap:10px; margin-top:10px; }
+  .modal-btn-row .btn{ flex:1; }
+
+  textarea{
+    width:100%; background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    border-radius:10px; padding:12px; font-family:var(--font-body); font-size:14px;
+    resize:vertical; min-height:60px;
+  }
+
+  .footer-actions{ margin-top:16px; display:flex; flex-direction:column; gap:10px; }
+  .msg{ font-size:12.5px; color:var(--muted); text-align:center; margin-top:8px; }
+
+  /* CALENDAR */
+  .grid{
+    display:grid; grid-template-columns:repeat(9, 1fr); gap:6px;
+  }
+  .cell{
+    aspect-ratio:1; border-radius:6px; display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-display); font-size:11px; font-weight:600;
+    background:var(--surface-2); color:var(--muted); border:1px solid var(--line);
+    position:relative;
+  }
+  .cell.done{ background:var(--done-dim); color:var(--done); border-color:var(--done); }
+  .cell.today{ outline:2px solid var(--ember); color:var(--text); }
+  .cell.future{ opacity:0.45; }
+  .legend{ display:flex; gap:16px; margin-top:14px; font-size:12px; color:var(--muted); flex-wrap:wrap; }
+  .dot{ display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:5px; }
+
+  /* STATS */
+  .stat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .stat{
+    background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px;
+  }
+  .stat .n{ font-family:var(--font-display); font-size:30px; font-weight:700; }
+  .stat .l{ font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-top:2px; }
+
+  .history-item{ display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line); font-size:13px; }
+  .history-item .d{ color:var(--muted); }
+
+  /* PHOTO */
+  .photo-zone{ margin-top:10px; }
+  .photo-thumb{
+    width:100%; max-width:220px; display:block; border-radius:10px;
+    border:1px solid var(--line); margin-bottom:10px; object-fit:cover;
+  }
+  .photo-actions{ display:flex; gap:8px; }
+  .photo-btn{ display:inline-flex; align-items:center; justify-content:center; width:auto; flex:1; }
+
+  .gallery-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
+  .gallery-cell{ position:relative; border-radius:10px; overflow:hidden; border:1px solid var(--line); background:var(--surface-2); aspect-ratio:1; }
+  .gallery-cell img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .gallery-day{
+    position:absolute; bottom:0; left:0; right:0; padding:4px 6px;
+    font-family:var(--font-display); font-size:10px; letter-spacing:0.04em;
+    background:linear-gradient(transparent, rgba(0,0,0,0.75)); color:#fff;
+  }
+
+  /* MEALS */
+  .macro-summary{ display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .macro-pill{
+    flex:1; min-width:70px; background:var(--surface-2); border:1px solid var(--line);
+    border-radius:10px; padding:9px 6px; text-align:center;
+  }
+  .macro-pill .v{ font-family:var(--font-display); font-size:18px; font-weight:700; }
+  .macro-pill .l{ font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-top:2px; }
+  .add-meal-label{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    border:1.5px dashed var(--line); border-radius:12px; padding:16px;
+    color:var(--muted); font-family:var(--font-display); font-size:13px;
+    text-transform:uppercase; letter-spacing:0.05em; cursor:pointer; margin-bottom:12px;
+  }
+  .add-meal-label.busy{ opacity:0.5; pointer-events:none; }
+  .meal-item{ display:flex; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); }
+  .meal-item:last-child{ border-bottom:none; }
+  .meal-thumb{ width:64px; height:64px; border-radius:10px; object-fit:cover; flex-shrink:0; border:1px solid var(--line); }
+  .meal-body{ flex:1; min-width:0; }
+  .meal-desc{ font-size:14px; font-weight:600; margin-bottom:3px; }
+  .meal-macros{ display:flex; gap:10px; font-size:12px; color:var(--muted); flex-wrap:wrap; margin-bottom:3px; }
+  .meal-macros b{ color:var(--text); }
+  .meal-note{ font-size:12px; color:var(--muted); font-style:italic; }
+  .meal-del{ background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer; padding:2px 6px; align-self:flex-start; }
+  .disclaimer{ font-size:11px; color:var(--muted); margin-top:10px; line-height:1.4; }
+
+  /* REFERENCE */
+  .ref-category{ margin-bottom:18px; }
+  .ref-category h3{
+    font-family:var(--font-display); font-size:12px; letter-spacing:0.07em; text-transform:uppercase;
+    color:var(--ember); margin:0 0 10px; font-weight:600;
+  }
+  .chip-row{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+  .chip{
+    display:flex; align-items:center; gap:6px; background:var(--surface-2); border:1px solid var(--line);
+    border-radius:20px; padding:6px 8px 6px 12px; font-size:13px;
+  }
+  .chip button{ background:none; border:none; color:var(--muted); font-size:14px; cursor:pointer; line-height:1; padding:0 2px; }
+  .add-row{ display:flex; gap:8px; }
+  .add-row input{
+    flex:1; background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    padding:9px 12px; border-radius:9px; font-family:var(--font-body); font-size:14px;
+  }
+  .add-row button{
+    background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    padding:0 16px; border-radius:9px; font-family:var(--font-display); font-size:13px; cursor:pointer;
+  }
+  textarea#dietRulesInput{ margin-bottom:4px; }
+
+  /* SUGGEST */
+  .suggest-input{
+    width:100%; background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    padding:12px; border-radius:10px; font-family:var(--font-body); font-size:15px; margin-bottom:10px;
+  }
+  .suggest-result{
+    background:var(--surface-2); border:1px solid var(--line); border-radius:12px;
+    padding:16px; margin-top:14px; font-size:14px; line-height:1.55; white-space:pre-wrap;
+  }
+  .suggest-history-item{
+    border-bottom:1px solid var(--line); padding:12px 0;
+  }
+  .suggest-history-item summary{ cursor:pointer; font-size:14px; font-weight:600; }
+  .suggest-history-item .meta{ font-size:12px; color:var(--muted); font-weight:400; }
+  .suggest-history-item .body{ margin-top:8px; font-size:13.5px; color:var(--text); white-space:pre-wrap; line-height:1.5; }
+
+  .toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    padding:12px 18px; border-radius:12px; font-size:13px; opacity:0;
+    transition:all .25s ease; pointer-events:none; max-width:90%; text-align:center;
+    z-index:50;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="brand">75 Hard // Personal Tracker</p>
+    <div id="headerCount"></div>
+    <div class="subline" id="headerSub"></div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" data-view="today">Today</div>
+    <div class="tab" data-view="reference">Reference</div>
+    <div class="tab" data-view="suggest">Suggest</div>
+    <div class="tab" data-view="calendar">Calendar</div>
+    <div class="tab" data-view="gallery">Photos</div>
+    <div class="tab" data-view="stats">Stats</div>
+  </div>
+
+  <!-- SETUP (shown if no start date) -->
+  <div id="setupCard" class="card" style="display:none;">
+    <h2>Start Your 75</h2>
+    <p class="msg" style="margin:0 0 14px;">No cheat meals. No missed workouts. One slip and it resets to Day 1. Pick your start date.</p>
+    <input type="date" id="startDateInput">
+    <button class="btn btn-primary" id="startBtn">Begin Day 1</button>
+  </div>
+
+  <!-- TODAY VIEW -->
+  <div class="view active" id="view-today">
+    <div class="card" id="todayCard" style="display:none;">
+      <h2>Day <span id="dayNum"></span> Checklist</h2>
+      <div id="taskList"></div>
+      <div class="footer-actions">
+        <button class="btn btn-primary" id="completeBtn" disabled>Complete Day</button>
+        <button class="btn btn-danger" id="resetBtn">I Missed One — Reset Streak</button>
+      </div>
+      <p class="msg" id="completeMsg"></p>
+    </div>
+
+    <div class="card" id="mealsCard" style="display:none;">
+      <h2>Meals Today</h2>
+      <div class="macro-summary" id="macroSummary"></div>
+      <label class="add-meal-label" id="addMealLabel">
+        📷 Snap a Meal Photo
+        <input type="file" accept="image/*" id="mealInput" style="display:none;">
+      </label>
+      <div id="mealsList"></div>
+      <p class="disclaimer">Estimates from photo analysis — meant to be generally right, not lab-precise. Use judgment for anything with allergies or strict medical needs.</p>
+    </div>
+  </div>
+
+  <!-- CALENDAR VIEW -->
+  <div class="view" id="view-calendar">
+    <div class="card">
+      <h2>75-Day Grid</h2>
+      <div class="grid" id="calGrid"></div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--done-dim); border:1px solid var(--done);"></span>Completed</span>
+        <span><span class="dot" style="background:var(--surface-2); border:1px solid var(--ember);"></span>Today</span>
+        <span><span class="dot" style="background:var(--surface-2); opacity:0.45; border:1px solid var(--line);"></span>Upcoming</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- GALLERY VIEW -->
+  <div class="view" id="view-gallery">
+    <div class="card">
+      <h2>Progress Photos</h2>
+      <div class="gallery-grid" id="galleryGrid"><p class="msg">Loading photos…</p></div>
+    </div>
+  </div>
+
+  <!-- REFERENCE VIEW -->
+  <div class="view" id="view-reference">
+    <div class="card">
+      <h2>Your Diet Rules</h2>
+      <textarea id="dietRulesInput" placeholder="e.g. no added sugar, no fried food, lean protein at every meal, no bread"></textarea>
+      <p class="disclaimer">Optional — this gets used to personalize the restaurant suggestions in the Suggest tab.</p>
+    </div>
+    <div class="card" id="refCard">
+      <h2>Quick Pick List</h2>
+      <div id="refCategories"></div>
+    </div>
+  </div>
+
+  <!-- SUGGEST VIEW -->
+  <div class="view" id="view-suggest">
+    <div class="card">
+      <h2>Restaurant Suggestion</h2>
+      <input type="text" class="suggest-input" id="suggestRestaurant" placeholder="Restaurant name (e.g. Chipotle, Torchy's Tacos)">
+      <input type="text" class="suggest-input" id="suggestLocation" placeholder="City/area (optional, helps find the right menu)">
+      <input type="text" class="suggest-input" id="suggestCraving" placeholder="Craving anything specific? (optional)">
+      <label class="add-meal-label" id="menuPhotoLabel">
+        📋 Attach Menu Photo <span style="opacity:0.7;">(if I can't find it online)</span>
+        <input type="file" accept="image/*" id="menuPhotoInput" style="display:none;">
+      </label>
+      <div id="menuPhotoPreview"></div>
+      <button class="btn btn-primary" id="suggestBtn">Get Recommendation</button>
+      <div id="suggestResult"></div>
+    </div>
+    <div class="card">
+      <h2>Past Suggestions</h2>
+      <div id="suggestHistory"><p class="msg">No suggestions yet.</p></div>
+    </div>
+  </div>
+
+  <!-- STATS VIEW -->
+  <div class="view" id="view-stats">
+    <div class="stat-grid" style="margin-bottom:14px;">
+      <div class="stat"><div class="n" id="statCurrentDay">-</div><div class="l">Current Day</div></div>
+      <div class="stat"><div class="n" id="statStreak">-</div><div class="l">Days Completed</div></div>
+      <div class="stat"><div class="n" id="statAttempts">-</div><div class="l">Attempts</div></div>
+      <div class="stat"><div class="n" id="statPct">-</div><div class="l">This Run Adherence</div></div>
+    </div>
+    <div class="card">
+      <h2>Totals This Attempt</h2>
+      <div class="stat-grid" id="lifetimeStats">
+        <div class="stat"><div class="n">-</div><div class="l">Gallons of Water</div></div>
+        <div class="stat"><div class="n">-</div><div class="l">Workouts Done</div></div>
+        <div class="stat"><div class="n">-</div><div class="l">~Pages Read</div></div>
+        <div class="stat"><div class="n">-</div><div class="l">Meals Logged</div></div>
+        <div class="stat"><div class="n">-</div><div class="l">Calories Logged</div></div>
+        <div class="stat"><div class="n">-</div><div class="l">Protein Logged</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Attempt History</h2>
+      <div id="historyList"><p class="msg">No resets yet — first attempt in progress.</p></div>
+    </div>
+    <div class="card">
+      <h2>Danger Zone</h2>
+      <button class="btn btn-ghost" id="wipeBtn">Wipe All Data &amp; Start Over</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="dayDetailModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h2 id="dayDetailTitle">Day</h2>
+      <button class="modal-close" id="dayDetailClose">✕</button>
+    </div>
+    <div id="dayDetailBody"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="resetConfirmModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h2>Confirm Reset</h2>
+      <button class="modal-close" id="resetConfirmCloseX">✕</button>
+    </div>
+    <p class="msg" style="text-align:left;" id="resetConfirmText"></p>
+    <p class="msg" style="text-align:left;">Type <b style="color:var(--text);">RESET</b> to confirm.</p>
+    <input type="text" class="confirm-input" id="resetConfirmInput" autocomplete="off" autocapitalize="characters">
+    <div class="modal-btn-row">
+      <button class="btn btn-ghost" id="resetConfirmCancel">Cancel</button>
+      <button class="btn btn-danger" id="resetConfirmBtn" disabled>Reset to Day 1</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   STORAGE SHIM — IndexedDB-backed drop-in replacement for the
+   Claude-artifact-only window.storage API. Same method names,
+   same return shapes, so no other code in this file needs to
+   change. Data lives in this browser/device only (no sync).
+   ============================================================ */
+(function(){
+  const DB_NAME = '75hard-store';
+  const STORE_NAME = 'kv';
+  let dbPromise = null;
+
+  function openDB(){
+    if(dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => {
+        if(!req.result.objectStoreNames.contains(STORE_NAME)){
+          req.result.createObjectStore(STORE_NAME);
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    return dbPromise;
+  }
+
+  window.storage = {
+    async get(key){
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const req = tx.objectStore(STORE_NAME).get(key);
+        req.onsuccess = () => {
+          if(req.result === undefined){ reject(new Error('Key not found: ' + key)); }
+          else resolve({ key, value: req.result, shared: false });
+        };
+        req.onerror = () => reject(req.error);
+      });
+    },
+    async set(key, value){
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).put(value, key);
+        tx.oncomplete = () => resolve({ key, value, shared: false });
+        tx.onerror = () => reject(tx.error);
+      });
+    },
+    async delete(key){
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).delete(key);
+        tx.oncomplete = () => resolve({ key, deleted: true, shared: false });
+        tx.onerror = () => reject(tx.error);
+      });
+    },
+    async list(prefix){
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const req = tx.objectStore(STORE_NAME).getAllKeys();
+        req.onsuccess = () => {
+          let keys = req.result;
+          if(prefix) keys = keys.filter(k => String(k).startsWith(prefix));
+          resolve({ keys, prefix, shared: false });
+        };
+        req.onerror = () => reject(req.error);
+      });
+    }
+  };
+})();
+
+/* Note: this single-file version skips the service worker / offline caching —
+   that requires hosting manifest.json + service-worker.js alongside it. */
+
+const TOTAL_DAYS = 75;
+const GALLON_OZ = 128;
+const WATER_INCREMENTS = [1, 8, 16, 32];
+
+const TASK_DEFS = [
+  { key:'workout1', label:'Workout #1', sub:'45 minutes, any type' },
+  { key:'workout2', label:'Workout #2 (outdoors)', sub:'45 minutes, must be outside' },
+  { key:'diet', label:'Followed the diet', sub:'No cheat meals, no exceptions' },
+  { key:'noAlcohol', label:'Zero alcohol', sub:'None, not even a sip' },
+  { key:'reading', label:'Read 10 pages', sub:'Non-fiction / personal development' },
+];
+
+let state = null; // loaded async
+
+const MILESTONE_MESSAGES = {
+  25: '🎉 Day 25 done — one third of 75 Hard behind you.',
+  50: '💪 Day 50 done — two thirds down. This is where it gets real.',
+};
+
+function todayISO(){
+  const d = new Date();
+  return d.toISOString().slice(0,10);
+}
+
+function daysBetween(a,b){
+  const A = new Date(a+'T00:00:00');
+  const B = new Date(b+'T00:00:00');
+  return Math.round((B-A)/(1000*60*60*24));
+}
+
+function emptyTasks(){
+  const t = {};
+  TASK_DEFS.forEach(d => t[d.key] = false);
+  t.waterOz = 0;
+  t.note = '';
+  t.photo = false;
+  return t;
+}
+
+function defaultState(){
+  return {
+    startDate: null,
+    currentDayIndex: 1, // 1-based
+    days: {}, // dayIndex -> tasks obj (only for current attempt, keyed by index 1..75)
+    completedDays: {},
+    attempts: [], // {startDate, endDate, resultDayReached, outcome: 'reset'|'finished'}
+    waterStep: 8, // remembered increment size (oz) for the water stepper
+  };
+}
+
+async function loadState(){
+  try{
+    const res = await window.storage.get('state');
+    if(res && res.value){
+      const loaded = JSON.parse(res.value);
+      if(!loaded.waterStep) loaded.waterStep = 8;
+      return loaded;
+    }
+  }catch(e){ /* not found */ }
+  return defaultState();
+}
+
+async function saveState(){
+  try{
+    await window.storage.set('state', JSON.stringify(state));
+  }catch(e){
+    console.error('Save failed', e);
+    showToast("Couldn't save — try again");
+  }
+}
+
+function showToast(msg, duration=2200){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=> t.classList.remove('show'), duration);
+}
+
+function getCurrentDayTasks(){
+  const idx = state.currentDayIndex;
+  if(!state.days[idx]) state.days[idx] = emptyTasks();
+  return state.days[idx];
+}
+
+function computeActualDayNumber(){
+  // How many calendar days since start, capped
+  if(!state.startDate) return 1;
+  const diff = daysBetween(state.startDate, todayISO());
+  return diff; // 0 = start day
+}
+
+function render(){
+  const hasStarted = !!state.startDate;
+  document.getElementById('setupCard').style.display = hasStarted ? 'none' : 'block';
+  document.getElementById('todayCard').style.display = hasStarted ? 'block' : 'none';
+  document.getElementById('mealsCard').style.display = hasStarted ? 'block' : 'none';
+
+  if(!hasStarted){
+    document.getElementById('headerCount').innerHTML = `<div class="big-count"><span class="num">DAY 0</span><span class="of">/ 75</span></div>`;
+    document.getElementById('headerSub').textContent = 'Set a start date to begin.';
+    renderCalendar();
+    renderStats();
+    return;
+  }
+
+  const dayNum = state.currentDayIndex;
+  document.getElementById('headerCount').innerHTML = `<div class="big-count"><span class="num">DAY ${dayNum}</span><span class="of">/ ${TOTAL_DAYS}</span></div>`;
+  const remaining = TOTAL_DAYS - dayNum;
+  document.getElementById('headerSub').innerHTML = `Started <b>${state.startDate}</b> · <b>${remaining}</b> day${remaining===1?'':'s'} to go after today`;
+
+  document.getElementById('dayNum').textContent = dayNum;
+
+  const tasks = getCurrentDayTasks();
+  const taskList = document.getElementById('taskList');
+  taskList.innerHTML = '';
+
+  TASK_DEFS.forEach(def => {
+    const checked = !!tasks[def.key];
+    const row = document.createElement('div');
+    row.className = 'task' + (checked ? ' done' : '');
+    row.innerHTML = `
+      <div class="checkbox ${checked?'checked':''}" data-key="${def.key}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0e1a12" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      </div>
+      <div class="task-body">
+        <div class="task-label">${def.label}</div>
+        <div class="task-sub">${def.sub}</div>
+      </div>
+    `;
+    row.querySelector('.checkbox').addEventListener('click', () => toggleTask(def.key));
+    taskList.appendChild(row);
+  });
+
+  // water row
+  const waterRow = document.createElement('div');
+  waterRow.className = 'task';
+  const waterPct = Math.min(100, Math.round((tasks.waterOz / GALLON_OZ) * 100));
+  waterRow.innerHTML = `
+    <div class="checkbox ${tasks.waterOz >= GALLON_OZ ? 'checked' : ''}" data-water-check="1">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#0e1a12" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+    </div>
+    <div class="task-body">
+      <div class="task-label">Drink 1 gallon of water</div>
+      <div class="task-sub">${tasks.waterOz} oz / ${GALLON_OZ} oz</div>
+      <div class="water-row">
+        <div class="stepper">
+          <button data-water="-1">−</button>
+          <span class="water-amt">${state.waterStep}oz</span>
+          <button data-water="1">+</button>
+        </div>
+        <div class="water-track"><div class="water-fill" style="width:${waterPct}%"></div></div>
+      </div>
+      <div class="water-inc-row">
+        ${WATER_INCREMENTS.map(inc => `<div class="water-inc-btn ${state.waterStep === inc ? 'active' : ''}" data-inc="${inc}">${inc} oz</div>`).join('')}
+      </div>
+    </div>
+  `;
+  taskList.appendChild(waterRow);
+  waterRow.querySelectorAll('[data-water]').forEach(btn=>{
+    btn.addEventListener('click', () => adjustWater(parseInt(btn.dataset.water)));
+  });
+  waterRow.querySelectorAll('[data-inc]').forEach(btn=>{
+    btn.addEventListener('click', () => setWaterIncrement(parseInt(btn.dataset.inc)));
+  });
+
+  // photo
+  const photoWrap = document.createElement('div');
+  photoWrap.id = 'photoBlock';
+  taskList.appendChild(photoWrap);
+  renderPhotoBlock();
+
+  // note
+  const noteWrap = document.createElement('div');
+  noteWrap.style.marginTop = '14px';
+  noteWrap.innerHTML = `<textarea placeholder="Notes for today (optional)">${tasks.note || ''}</textarea>`;
+  taskList.appendChild(noteWrap);
+  noteWrap.querySelector('textarea').addEventListener('input', (e) => {
+    tasks.note = e.target.value;
+    saveState();
+  });
+
+  const allDone = TASK_DEFS.every(d => tasks[d.key]) && tasks.waterOz >= GALLON_OZ && tasks.photo;
+  const completeBtn = document.getElementById('completeBtn');
+  completeBtn.disabled = !allDone;
+  document.getElementById('completeMsg').textContent = allDone
+    ? 'Everything checked. Lock in today and move to the next day.'
+    : `${TASK_DEFS.filter(d=>!tasks[d.key]).length + (tasks.waterOz < GALLON_OZ ? 1 : 0) + (tasks.photo ? 0 : 1)} item(s) left today.`;
+
+  renderCalendar();
+  renderStats();
+  renderMeals();
+}
+
+function toggleTask(key){
+  const tasks = getCurrentDayTasks();
+  tasks[key] = !tasks[key];
+  saveState();
+  render();
+}
+
+function adjustWater(dir){
+  const tasks = getCurrentDayTasks();
+  tasks.waterOz = Math.max(0, Math.min(GALLON_OZ, (tasks.waterOz||0) + dir*state.waterStep));
+  saveState();
+  render();
+}
+
+function setWaterIncrement(inc){
+  state.waterStep = inc;
+  saveState();
+  render();
+}
+
+async function completeDay(){
+  const tasks = getCurrentDayTasks();
+  const allDone = TASK_DEFS.every(d => tasks[d.key]) && tasks.waterOz >= GALLON_OZ && tasks.photo;
+  if(!allDone) return;
+
+  const justFinishedDay = state.currentDayIndex;
+  state.completedDays[justFinishedDay] = true;
+
+  if(state.currentDayIndex >= TOTAL_DAYS){
+    // Finished the whole thing!
+    state.attempts.push({
+      startDate: state.startDate,
+      endDate: todayISO(),
+      resultDayReached: TOTAL_DAYS,
+      outcome: 'finished'
+    });
+    await saveState();
+    showToast('🏆 75 DAYS DONE. Congratulations.', 4000);
+    render();
+    return;
+  }
+
+  state.currentDayIndex += 1;
+  await saveState();
+
+  if(MILESTONE_MESSAGES[justFinishedDay]){
+    showToast(MILESTONE_MESSAGES[justFinishedDay], 4000);
+  } else {
+    showToast(`Day locked in. Welcome to Day ${state.currentDayIndex}.`);
+  }
+  render();
+}
+
+function openResetConfirm(){
+  document.getElementById('resetConfirmText').textContent =
+    `This resets you to Day 1. Your progress on this attempt (through Day ${state.currentDayIndex}) gets logged as a failed attempt, per the rules — no partial credit.`;
+  const input = document.getElementById('resetConfirmInput');
+  input.value = '';
+  document.getElementById('resetConfirmBtn').disabled = true;
+  document.getElementById('resetConfirmModal').classList.add('show');
+  setTimeout(() => input.focus(), 50);
+}
+
+function closeResetConfirm(){
+  document.getElementById('resetConfirmModal').classList.remove('show');
+}
+
+async function performReset(){
+  state.attempts.push({
+    startDate: state.startDate,
+    endDate: todayISO(),
+    resultDayReached: state.currentDayIndex,
+    outcome: 'reset'
+  });
+
+  state.startDate = todayISO();
+  state.currentDayIndex = 1;
+  state.days = {};
+  state.completedDays = {};
+  await saveState();
+  closeResetConfirm();
+  showToast('Streak reset. Day 1 starts now.');
+  render();
+}
+
+async function startChallenge(){
+  const val = document.getElementById('startDateInput').value;
+  const start = val || todayISO();
+  state.startDate = start;
+  state.currentDayIndex = 1;
+  state.days = {};
+  state.completedDays = {};
+  await saveState();
+  showToast('Day 1 is live. No excuses.');
+  render();
+}
+
+async function wipeAll(){
+  const ok = confirm('This deletes everything — all attempts, all history, all photos, all meal logs. Are you sure?');
+  if(!ok) return;
+  try{
+    const photoRes = await window.storage.list('photo:');
+    const photoKeys = (photoRes && photoRes.keys) || [];
+    for(const k of photoKeys){ await window.storage.delete(k); }
+    const mealRes = await window.storage.list('meals:');
+    const mealKeys = (mealRes && mealRes.keys) || [];
+    for(const k of mealKeys){ await window.storage.delete(k); }
+    await window.storage.delete('dietRules').catch(()=>{});
+    await window.storage.delete('quickRef').catch(()=>{});
+    await window.storage.delete('suggestHistory').catch(()=>{});
+  }catch(e){ /* nothing to clear */ }
+  state = defaultState();
+  await saveState();
+  showToast('Wiped clean.');
+  render();
+}
+
+function renderCalendar(){
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+  for(let i=1;i<=TOTAL_DAYS;i++){
+    const cell = document.createElement('div');
+    let cls = 'cell';
+    if(state.completedDays[i]) cls += ' done';
+    else if(state.startDate && i > state.currentDayIndex) cls += ' future';
+    else if(state.startDate && i === state.currentDayIndex) cls += ' today';
+    else if(!state.startDate) cls += ' future';
+    cell.className = cls;
+    cell.textContent = i;
+    if(state.startDate && i <= state.currentDayIndex){
+      cell.style.cursor = 'pointer';
+      cell.addEventListener('click', () => openDayDetail(i));
+    }
+    grid.appendChild(cell);
+  }
+}
+
+function renderStats(){
+  const completedCount = Object.keys(state.completedDays).length;
+  document.getElementById('statCurrentDay').textContent = state.startDate ? state.currentDayIndex : '—';
+  document.getElementById('statStreak').textContent = completedCount;
+  document.getElementById('statAttempts').textContent = state.attempts.length + (state.startDate ? 1 : 0);
+  const pct = state.startDate ? Math.round((completedCount / Math.max(1,(state.currentDayIndex))) * 100) : 0;
+  document.getElementById('statPct').textContent = state.startDate ? pct + '%' : '—';
+
+  const list = document.getElementById('historyList');
+  if(state.attempts.length === 0){
+    list.innerHTML = '<p class="msg">No resets yet — first attempt in progress.</p>';
+  } else {
+    list.innerHTML = '';
+    state.attempts.slice().reverse().forEach(a => {
+      const row = document.createElement('div');
+      row.className = 'history-item';
+      const outcomeLabel = a.outcome === 'finished' ? 'FINISHED 75' : `Reset on Day ${a.resultDayReached}`;
+      row.innerHTML = `<span>${a.startDate} → ${a.endDate}</span><span class="d">${outcomeLabel}</span>`;
+      list.appendChild(row);
+    });
+  }
+}
+
+function compressImage(file, maxDim=900, quality=0.7){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if(w > h){ if(w > maxDim){ h = Math.round(h * maxDim / w); w = maxDim; } }
+        else { if(h > maxDim){ w = Math.round(w * maxDim / h); h = maxDim; } }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('Could not read that image'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error('Could not read that file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function savePhotoForDay(dayIndex, dataUrl){
+  try{
+    const res = await window.storage.set('photo:' + dayIndex, dataUrl);
+    return !!res;
+  }catch(e){
+    console.error('Photo save failed', e);
+    return false;
+  }
+}
+
+async function loadPhotoForDay(dayIndex){
+  try{
+    const res = await window.storage.get('photo:' + dayIndex);
+    return res ? res.value : null;
+  }catch(e){
+    return null; // key doesn't exist yet
+  }
+}
+
+async function deletePhotoForDay(dayIndex){
+  try{ await window.storage.delete('photo:' + dayIndex); }catch(e){ /* already gone */ }
+}
+
+async function renderPhotoBlock(){
+  const container = document.getElementById('photoBlock');
+  if(!container) return;
+  const dayIndex = state.currentDayIndex;
+  const tasks = getCurrentDayTasks();
+  const photo = await loadPhotoForDay(dayIndex);
+
+  container.innerHTML = `
+    <div class="task">
+      <div class="checkbox ${tasks.photo ? 'checked' : ''}" style="pointer-events:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0e1a12" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      </div>
+      <div class="task-body">
+        <div class="task-label">Progress photo</div>
+        <div class="task-sub">Same time, same spot</div>
+        <div class="photo-zone">
+          ${photo ? `<img src="${photo}" class="photo-thumb">` : ''}
+          <div class="photo-actions">
+            <label class="btn btn-ghost photo-btn">${photo ? 'Retake' : 'Take / Upload'}
+              <input type="file" accept="image/*" capture="environment" id="photoInput" style="display:none;">
+            </label>
+            ${photo ? '<button class="btn btn-ghost photo-btn" id="removePhotoBtn">Remove</button>' : ''}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('photoInput').addEventListener('change', handlePhotoSelect);
+  const rmBtn = document.getElementById('removePhotoBtn');
+  if(rmBtn){
+    rmBtn.addEventListener('click', async () => {
+      await deletePhotoForDay(dayIndex);
+      tasks.photo = false;
+      await saveState();
+      render();
+    });
+  }
+}
+
+async function handlePhotoSelect(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  showToast('Compressing photo…');
+  try{
+    const dataUrl = await compressImage(file);
+    const ok = await savePhotoForDay(state.currentDayIndex, dataUrl);
+    if(ok){
+      const tasks = getCurrentDayTasks();
+      tasks.photo = true;
+      await saveState();
+      showToast('Photo saved');
+      render();
+    } else {
+      showToast("Couldn't save that photo — try again");
+    }
+  }catch(err){
+    console.error(err);
+    showToast("Couldn't process that photo");
+  }
+}
+
+async function renderGallery(){
+  const container = document.getElementById('galleryGrid');
+  if(!container) return;
+  container.innerHTML = '<p class="msg">Loading photos…</p>';
+  let keys = [];
+  try{
+    const res = await window.storage.list('photo:');
+    keys = (res && res.keys) || [];
+  }catch(e){ keys = []; }
+
+  if(keys.length === 0){
+    container.innerHTML = '<p class="msg">No photos yet — add one from Today.</p>';
+    return;
+  }
+
+  const indices = keys
+    .map(k => parseInt(k.split(':')[1], 10))
+    .filter(n => !isNaN(n))
+    .sort((a,b) => a - b);
+
+  container.innerHTML = '';
+  for(const idx of indices){
+    const photo = await loadPhotoForDay(idx);
+    if(!photo) continue;
+    const cell = document.createElement('div');
+    cell.className = 'gallery-cell';
+    cell.innerHTML = `<img src="${photo}"><span class="gallery-day">Day ${idx}</span>`;
+    container.appendChild(cell);
+  }
+}
+
+async function loadMealsForDay(dayIndex){
+  try{
+    const res = await window.storage.get('meals:' + dayIndex);
+    return res && res.value ? JSON.parse(res.value) : [];
+  }catch(e){
+    return [];
+  }
+}
+
+async function saveMealsForDay(dayIndex, meals){
+  try{
+    await window.storage.set('meals:' + dayIndex, JSON.stringify(meals));
+    return true;
+  }catch(e){
+    console.error('Meal save failed', e);
+    return false;
+  }
+}
+
+const MEAL_PROMPT = `You're estimating nutrition from a photo of a meal for a personal diet tracker. Respond with ONLY a raw JSON object, no markdown fences, no preamble, matching exactly this shape:
+{"description": "short 3-6 word description of the food", "calories": integer, "protein_g": integer, "carbs_g": integer, "fat_g": integer, "wellness_note": "one short plain sentence on how this fits a generally healthy diet (whole foods vs processed, balance, portion)", "confidence": "low" | "medium" | "high"}
+Give your best reasonable estimate based on typical portion sizes and standard ingredients visible in the photo, even under uncertainty. Do not refuse or hedge — always return your best numeric estimate. If the image doesn't show food, still return the JSON shape with description "not food" and zeros.`;
+
+async function analyzeMealPhoto(dataUrl){
+  const base64 = dataUrl.split(',')[1];
+  const response = await fetch("/.netlify/functions/claude-proxy", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 400,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64 } },
+          { type: "text", text: MEAL_PROMPT }
+        ]
+      }]
+    })
+  });
+  const data = await response.json();
+  const textBlock = (data.content || []).find(b => b.type === 'text');
+  if(!textBlock) throw new Error('No analysis returned');
+  const cleaned = textBlock.text.replace(/```json|```/g, '').trim();
+  return JSON.parse(cleaned);
+}
+
+async function handleMealPhotoSelect(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const label = document.getElementById('addMealLabel');
+  label.classList.add('busy');
+  label.firstChild.textContent = '⏳ Analyzing photo…';
+  try{
+    const dataUrl = await compressImage(file, 700, 0.6);
+    const analysis = await analyzeMealPhoto(dataUrl);
+    const meal = {
+      id: Date.now().toString(36),
+      time: new Date().toTimeString().slice(0,5),
+      photo: dataUrl,
+      description: analysis.description || 'Meal',
+      calories: Number(analysis.calories) || 0,
+      protein_g: Number(analysis.protein_g) || 0,
+      carbs_g: Number(analysis.carbs_g) || 0,
+      fat_g: Number(analysis.fat_g) || 0,
+      wellness_note: analysis.wellness_note || '',
+      confidence: analysis.confidence || 'medium',
+    };
+    const dayIndex = state.currentDayIndex;
+    const meals = await loadMealsForDay(dayIndex);
+    meals.push(meal);
+    await saveMealsForDay(dayIndex, meals);
+    showToast('Meal logged');
+  }catch(err){
+    console.error(err);
+    showToast("Couldn't read that photo — try a clearer shot");
+  }finally{
+    label.classList.remove('busy');
+    label.firstChild.textContent = '📷 Snap a Meal Photo';
+    e.target.value = '';
+    renderMeals();
+  }
+}
+
+async function deleteMeal(dayIndex, mealId){
+  const meals = await loadMealsForDay(dayIndex);
+  const filtered = meals.filter(m => m.id !== mealId);
+  await saveMealsForDay(dayIndex, filtered);
+  renderMeals();
+}
+
+async function renderMeals(){
+  if(!state.startDate) return;
+  const dayIndex = state.currentDayIndex;
+  const meals = await loadMealsForDay(dayIndex);
+
+  const totals = meals.reduce((acc, m) => {
+    acc.calories += m.calories; acc.protein_g += m.protein_g;
+    acc.carbs_g += m.carbs_g; acc.fat_g += m.fat_g;
+    return acc;
+  }, { calories:0, protein_g:0, carbs_g:0, fat_g:0 });
+
+  document.getElementById('macroSummary').innerHTML = `
+    <div class="macro-pill"><div class="v">${totals.calories}</div><div class="l">Calories</div></div>
+    <div class="macro-pill"><div class="v">${totals.protein_g}g</div><div class="l">Protein</div></div>
+    <div class="macro-pill"><div class="v">${totals.carbs_g}g</div><div class="l">Carbs</div></div>
+    <div class="macro-pill"><div class="v">${totals.fat_g}g</div><div class="l">Fat</div></div>
+  `;
+
+  const list = document.getElementById('mealsList');
+  if(meals.length === 0){
+    list.innerHTML = '<p class="msg">No meals logged yet today.</p>';
+  } else {
+    list.innerHTML = '';
+    meals.slice().reverse().forEach(m => {
+      const row = document.createElement('div');
+      row.className = 'meal-item';
+      row.innerHTML = `
+        <img src="${m.photo}" class="meal-thumb">
+        <div class="meal-body">
+          <div class="meal-desc">${m.description} <span style="color:var(--muted); font-weight:400;">· ${m.time}</span></div>
+          <div class="meal-macros"><b>${m.calories}</b> cal &nbsp; <b>${m.protein_g}g</b> protein &nbsp; <b>${m.carbs_g}g</b> carb &nbsp; <b>${m.fat_g}g</b> fat</div>
+          <div class="meal-note">${m.wellness_note}</div>
+        </div>
+        <button class="meal-del" data-id="${m.id}">✕</button>
+      `;
+      row.querySelector('.meal-del').addEventListener('click', () => deleteMeal(dayIndex, m.id));
+      list.appendChild(row);
+    });
+  }
+}
+
+const DEFAULT_QUICK_REF = {
+  proteins: ['Chicken breast', 'Eggs', 'Greek yogurt', 'Salmon', 'Lean ground turkey', 'Tofu', 'Cottage cheese'],
+  carbs: ['Sweet potato', 'Brown rice', 'Oats', 'Quinoa', 'Whole grain bread'],
+  veggies: ['Broccoli', 'Spinach', 'Mixed greens', 'Berries', 'Apple'],
+  snacks: ['Almonds', 'Protein shake', 'Hard boiled eggs', 'Rice cakes'],
+  avoid: ['Fried foods', 'Sugary drinks & soda', 'Added-sugar desserts', 'Creamy/heavy sauces', 'Alcohol'],
+};
+const REF_CATEGORIES = [
+  { key:'proteins', label:'Proteins' },
+  { key:'carbs', label:'Carbs & Grains' },
+  { key:'veggies', label:'Veggies & Fruit' },
+  { key:'snacks', label:'Snacks' },
+  { key:'avoid', label:'Avoid / Watch Out' },
+];
+
+async function loadDietRules(){
+  try{
+    const res = await window.storage.get('dietRules');
+    return res && res.value ? res.value : '';
+  }catch(e){ return ''; }
+}
+
+async function saveDietRules(text){
+  try{ await window.storage.set('dietRules', text); }catch(e){ console.error(e); }
+}
+
+async function loadQuickRef(){
+  try{
+    const res = await window.storage.get('quickRef');
+    if(res && res.value) return JSON.parse(res.value);
+  }catch(e){ /* fall through to default */ }
+  return JSON.parse(JSON.stringify(DEFAULT_QUICK_REF));
+}
+
+async function saveQuickRef(ref){
+  try{ await window.storage.set('quickRef', JSON.stringify(ref)); }catch(e){ console.error(e); }
+}
+
+async function renderReference(){
+  const dietRulesEl = document.getElementById('dietRulesInput');
+  if(!dietRulesEl.dataset.loaded){
+    dietRulesEl.value = await loadDietRules();
+    dietRulesEl.dataset.loaded = '1';
+    let saveTimer;
+    dietRulesEl.addEventListener('input', () => {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => saveDietRules(dietRulesEl.value), 500);
+    });
+  }
+
+  const ref = await loadQuickRef();
+  const container = document.getElementById('refCategories');
+  container.innerHTML = '';
+
+  REF_CATEGORIES.forEach(cat => {
+    const items = ref[cat.key] || [];
+    const block = document.createElement('div');
+    block.className = 'ref-category';
+    block.innerHTML = `
+      <h3>${cat.label}</h3>
+      <div class="chip-row">
+        ${items.map(item => `<span class="chip">${item}<button data-cat="${cat.key}" data-item="${item.replace(/"/g,'&quot;')}">✕</button></span>`).join('')}
+      </div>
+      <div class="add-row">
+        <input type="text" placeholder="Add to ${cat.label.toLowerCase()}…" data-add-input="${cat.key}">
+        <button data-add-btn="${cat.key}">Add</button>
+      </div>
+    `;
+    container.appendChild(block);
+  });
+
+  container.querySelectorAll('button[data-cat]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const ref2 = await loadQuickRef();
+      ref2[btn.dataset.cat] = (ref2[btn.dataset.cat] || []).filter(i => i !== btn.dataset.item);
+      await saveQuickRef(ref2);
+      renderReference();
+    });
+  });
+
+  container.querySelectorAll('button[data-add-btn]').forEach(btn => {
+    const key = btn.dataset.addBtn;
+    const input = container.querySelector(`input[data-add-input="${key}"]`);
+    const doAdd = async () => {
+      const val = input.value.trim();
+      if(!val) return;
+      const ref3 = await loadQuickRef();
+      if(!ref3[key]) ref3[key] = [];
+      if(!ref3[key].includes(val)) ref3[key].push(val);
+      await saveQuickRef(ref3);
+      renderReference();
+    };
+    btn.addEventListener('click', doAdd);
+    input.addEventListener('keydown', (e) => { if(e.key === 'Enter') doAdd(); });
+  });
+}
+
+let currentMenuPhoto = null;
+
+async function handleMenuPhotoSelect(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const label = document.getElementById('menuPhotoLabel');
+  label.classList.add('busy');
+  try{
+    // Higher res / quality than meal photos since we need the text legible
+    currentMenuPhoto = await compressImage(file, 1200, 0.75);
+    renderMenuPhotoPreview();
+  }catch(err){
+    console.error(err);
+    showToast("Couldn't read that image");
+  }finally{
+    label.classList.remove('busy');
+    e.target.value = '';
+  }
+}
+
+function clearMenuPhoto(){
+  currentMenuPhoto = null;
+  renderMenuPhotoPreview();
+}
+
+function renderMenuPhotoPreview(){
+  const container = document.getElementById('menuPhotoPreview');
+  if(!currentMenuPhoto){
+    container.innerHTML = '';
+    return;
+  }
+  container.innerHTML = `
+    <div class="photo-zone">
+      <img src="${currentMenuPhoto}" class="photo-thumb">
+      <div class="photo-actions">
+        <button class="btn btn-ghost photo-btn" id="removeMenuPhotoBtn">Remove Photo</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('removeMenuPhotoBtn').addEventListener('click', clearMenuPhoto);
+}
+
+const SUGGEST_PROMPT_HEADER = `You're helping someone stick to a strict health challenge: no alcohol, zero cheat meals, whole foods, lean protein, minimal fried food or added sugar. Give practical, specific ordering advice, not generic diet talk.`;
+
+async function getRestaurantSuggestion(restaurant, location, craving, dietRules, menuPhotoDataUrl){
+  const basePrompt = `${SUGGEST_PROMPT_HEADER}
+${dietRules ? 'Their specific diet notes: ' + dietRules : ''}
+They're eating at: "${restaurant}"${location ? ' in ' + location : ''}.
+${craving ? 'They are in the mood for: ' + craving : ''}`;
+
+  let messageContent;
+  let tools;
+
+  if(menuPhotoDataUrl){
+    const base64 = menuPhotoDataUrl.split(',')[1];
+    messageContent = [
+      { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64 } },
+      { type: "text", text: `${basePrompt}
+
+Here is an actual photo of this restaurant's menu. Read it directly and recommend 2-3 specific items from what's actually on it that best fit the diet, with a one-line reason for each. Then flag 1-2 items to skip or a swap to ask for. Keep it tight — under 150 words, plain text, no markdown headers or asterisks.` }
+    ];
+  } else {
+    messageContent = `${basePrompt}
+
+Search for this restaurant's actual menu if you can find it. Recommend 2-3 specific menu items that best fit the diet, with a one-line reason for each (protein content, avoiding fried/sugar/sauce, etc). Then flag 1-2 things on the menu to skip or a swap to ask for. If you can't find the exact menu, give a general ordering strategy for this type of restaurant or cuisine instead. Keep it tight — under 150 words, plain text, no markdown headers or asterisks.`;
+    tools = [{ type: "web_search_20250305", name: "web_search" }];
+  }
+
+  const body = {
+    model: "claude-sonnet-4-6",
+    max_tokens: 600,
+    messages: [{ role: "user", content: messageContent }],
+  };
+  if(tools) body.tools = tools;
+
+  const response = await fetch("/.netlify/functions/claude-proxy", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const data = await response.json();
+  const textBlocks = (data.content || []).filter(b => b.type === 'text').map(b => b.text);
+  const combined = textBlocks.join('\n').trim();
+  if(!combined) throw new Error('No suggestion returned');
+  return combined;
+}
+
+async function loadSuggestHistory(){
+  try{
+    const res = await window.storage.get('suggestHistory');
+    return res && res.value ? JSON.parse(res.value) : [];
+  }catch(e){ return []; }
+}
+
+async function saveSuggestHistory(list){
+  try{ await window.storage.set('suggestHistory', JSON.stringify(list.slice(0, 20))); }catch(e){ console.error(e); }
+}
+
+async function handleGetSuggestion(){
+  const restaurant = document.getElementById('suggestRestaurant').value.trim();
+  const location = document.getElementById('suggestLocation').value.trim();
+  const craving = document.getElementById('suggestCraving').value.trim();
+  if(!restaurant){ showToast('Enter a restaurant name first'); return; }
+
+  const btn = document.getElementById('suggestBtn');
+  const resultBox = document.getElementById('suggestResult');
+  btn.disabled = true;
+  btn.textContent = 'Looking that up…';
+  resultBox.innerHTML = '';
+
+  try{
+    const dietRules = await loadDietRules();
+    const usedPhoto = currentMenuPhoto;
+    const suggestion = await getRestaurantSuggestion(restaurant, location, craving, dietRules, usedPhoto);
+    resultBox.innerHTML = `<div class="suggest-result">${suggestion}</div>`;
+
+    const history = await loadSuggestHistory();
+    history.unshift({
+      restaurant, location, craving, suggestion,
+      menuPhoto: usedPhoto || null,
+      timestamp: new Date().toISOString()
+    });
+    await saveSuggestHistory(history);
+    clearMenuPhoto();
+    renderSuggestHistory();
+  }catch(err){
+    console.error(err);
+    resultBox.innerHTML = `<div class="suggest-result">Couldn't get a suggestion just now — try again in a moment.</div>`;
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Get Recommendation';
+  }
+}
+
+async function renderSuggestHistory(){
+  const container = document.getElementById('suggestHistory');
+  const history = await loadSuggestHistory();
+  if(history.length === 0){
+    container.innerHTML = '<p class="msg">No suggestions yet.</p>';
+    return;
+  }
+  container.innerHTML = '';
+  history.forEach(h => {
+    const dateStr = new Date(h.timestamp).toLocaleDateString(undefined, { month:'short', day:'numeric' });
+    const item = document.createElement('details');
+    item.className = 'suggest-history-item';
+    item.innerHTML = `
+      <summary>${h.restaurant} <span class="meta">· ${dateStr}</span></summary>
+      ${h.menuPhoto ? `<img src="${h.menuPhoto}" class="photo-thumb" style="margin-top:8px;">` : ''}
+      <div class="body">${h.suggestion}</div>
+    `;
+    container.appendChild(item);
+  });
+}
+
+async function calculateLifetimeStats(){
+  let totalWaterOz = 0;
+  let workoutCount = 0;
+  let readingDays = 0;
+
+  const dayIndices = Object.keys(state.days).map(Number);
+  dayIndices.forEach(idx => {
+    const t = state.days[idx];
+    if(!t) return;
+    totalWaterOz += t.waterOz || 0;
+    if(t.workout1) workoutCount++;
+    if(t.workout2) workoutCount++;
+    if(t.reading) readingDays++;
+  });
+
+  let totalMeals = 0, totalCalories = 0, totalProtein = 0;
+  for(const idx of dayIndices){
+    const meals = await loadMealsForDay(idx);
+    totalMeals += meals.length;
+    meals.forEach(m => { totalCalories += (m.calories||0); totalProtein += (m.protein_g||0); });
+  }
+
+  return {
+    gallons: (totalWaterOz / GALLON_OZ).toFixed(1),
+    workoutCount,
+    approxPages: readingDays * 10,
+    totalMeals,
+    totalCalories,
+    totalProtein,
+  };
+}
+
+async function renderLifetimeStats(){
+  const container = document.getElementById('lifetimeStats');
+  if(!container) return;
+  if(!state.startDate){
+    container.querySelectorAll('.stat .n').forEach(el => el.textContent = '—');
+    return;
+  }
+  const s = await calculateLifetimeStats();
+  const cells = container.querySelectorAll('.stat .n');
+  cells[0].textContent = s.gallons;
+  cells[1].textContent = s.workoutCount;
+  cells[2].textContent = '~' + s.approxPages;
+  cells[3].textContent = s.totalMeals;
+  cells[4].textContent = s.totalCalories.toLocaleString();
+  cells[5].textContent = s.totalProtein + 'g';
+}
+
+function dateForDayIndex(idx){
+  if(!state.startDate) return '';
+  const d = new Date(state.startDate + 'T00:00:00');
+  d.setDate(d.getDate() + (idx - 1));
+  return d.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+}
+
+async function openDayDetail(dayIndex){
+  const tasks = state.days[dayIndex];
+  const modal = document.getElementById('dayDetailModal');
+  const body = document.getElementById('dayDetailBody');
+  const dateStr = dateForDayIndex(dayIndex);
+  document.getElementById('dayDetailTitle').textContent = `Day ${dayIndex}` + (dateStr ? ' — ' + dateStr : '');
+
+  if(!tasks){
+    body.innerHTML = '<p class="msg">No data logged for this day.</p>';
+    modal.classList.add('show');
+    return;
+  }
+
+  body.innerHTML = '<p class="msg">Loading…</p>';
+  modal.classList.add('show');
+
+  const [photo, meals] = await Promise.all([
+    loadPhotoForDay(dayIndex),
+    loadMealsForDay(dayIndex)
+  ]);
+
+  let html = '';
+  TASK_DEFS.forEach(def => {
+    html += `<div class="detail-row">${tasks[def.key] ? '✅' : '⬜'} ${def.label}</div>`;
+  });
+  html += `<div class="detail-row">${tasks.waterOz >= GALLON_OZ ? '✅' : '⬜'} Water: ${tasks.waterOz} / ${GALLON_OZ} oz</div>`;
+  html += `<div class="detail-row">${tasks.photo ? '✅' : '⬜'} Progress photo</div>`;
+
+  if(tasks.note){
+    html += `<div class="detail-note">"${tasks.note}"</div>`;
+  }
+
+  if(photo){
+    html += `<img src="${photo}" class="photo-thumb" style="max-width:180px; margin-top:12px;">`;
+  }
+
+  if(meals.length){
+    html += '<div class="detail-subhead">Meals</div>';
+    meals.forEach(m => {
+      html += `
+        <div class="meal-item">
+          <img src="${m.photo}" class="meal-thumb">
+          <div class="meal-body">
+            <div class="meal-desc">${m.description} <span style="color:var(--muted); font-weight:400;">· ${m.time}</span></div>
+            <div class="meal-macros"><b>${m.calories}</b> cal &nbsp; <b>${m.protein_g}g</b> protein &nbsp; <b>${m.carbs_g}g</b> carb &nbsp; <b>${m.fat_g}g</b> fat</div>
+            <div class="meal-note">${m.wellness_note}</div>
+          </div>
+        </div>`;
+    });
+  }
+
+  body.innerHTML = html;
+}
+
+function closeDayDetail(){
+  document.getElementById('dayDetailModal').classList.remove('show');
+}
+
+function setupTabs(){
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('view-' + tab.dataset.view).classList.add('active');
+      if(tab.dataset.view === 'gallery') renderGallery();
+      if(tab.dataset.view === 'reference') renderReference();
+      if(tab.dataset.view === 'suggest') renderSuggestHistory();
+      if(tab.dataset.view === 'stats') renderLifetimeStats();
+    });
+  });
+}
+
+async function init(){
+  state = await loadState();
+  document.getElementById('startDateInput').value = todayISO();
+  document.getElementById('startBtn').addEventListener('click', startChallenge);
+  document.getElementById('completeBtn').addEventListener('click', completeDay);
+  document.getElementById('resetBtn').addEventListener('click', openResetConfirm);
+  document.getElementById('resetConfirmCancel').addEventListener('click', closeResetConfirm);
+  document.getElementById('resetConfirmCloseX').addEventListener('click', closeResetConfirm);
+  document.getElementById('resetConfirmModal').addEventListener('click', (e) => {
+    if(e.target.id === 'resetConfirmModal') closeResetConfirm();
+  });
+  document.getElementById('resetConfirmInput').addEventListener('input', (e) => {
+    document.getElementById('resetConfirmBtn').disabled = e.target.value.trim().toUpperCase() !== 'RESET';
+  });
+  document.getElementById('resetConfirmBtn').addEventListener('click', performReset);
+  document.getElementById('wipeBtn').addEventListener('click', wipeAll);
+  document.getElementById('mealInput').addEventListener('change', handleMealPhotoSelect);
+  document.getElementById('suggestBtn').addEventListener('click', handleGetSuggestion);
+  document.getElementById('menuPhotoInput').addEventListener('change', handleMenuPhotoSelect);
+  document.getElementById('dayDetailClose').addEventListener('click', closeDayDetail);
+  document.getElementById('dayDetailModal').addEventListener('click', (e) => {
+    if(e.target.id === 'dayDetailModal') closeDayDetail();
+  });
+  setupTabs();
+  render();
+}
+
+init();
+</script>
+</body>
+</html>
