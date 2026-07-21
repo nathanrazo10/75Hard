@@ -68,13 +68,24 @@
   .subline b{ color:var(--text); }
 
   /* TABS */
-  .tabs{ display:flex; gap:6px; margin:18px 0 16px; background:var(--surface); padding:4px; border-radius:12px; border:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
+  .tabs-wrap{ position:relative; margin:18px 0 16px; }
+  .tabs-wrap::after{
+    content:''; position:absolute; top:0; right:0; bottom:0; width:28px;
+    background:linear-gradient(to right, transparent, var(--bg) 85%);
+    border-radius:0 12px 12px 0; pointer-events:none;
+  }
+  .tabs{
+    display:flex; gap:6px; background:var(--surface); padding:4px; border-radius:12px;
+    border:1px solid var(--line); overflow-x:auto; scrollbar-width:none;
+    scroll-snap-type:x proximity;
+  }
   .tabs::-webkit-scrollbar{ display:none; }
   .tab{
     flex:0 0 auto; text-align:center; padding:10px 14px; border-radius:9px;
     font-family:var(--font-display); font-size:13px; letter-spacing:0.06em;
     text-transform:uppercase; font-weight:500; color:var(--muted); white-space:nowrap;
     cursor:pointer; user-select:none; transition:all .15s ease;
+    scroll-snap-align:start;
   }
   .tab.active{ background:var(--surface-2); color:var(--text); }
 
@@ -337,13 +348,15 @@
     <div class="subline" id="headerSub"></div>
   </header>
 
-  <div class="tabs">
-    <div class="tab active" data-view="today">Today</div>
-    <div class="tab" data-view="reference">Reference</div>
-    <div class="tab" data-view="suggest">Suggest</div>
-    <div class="tab" data-view="calendar">Calendar</div>
-    <div class="tab" data-view="gallery">Photos</div>
-    <div class="tab" data-view="stats">Stats</div>
+  <div class="tabs-wrap">
+    <div class="tabs">
+      <div class="tab active" data-view="today">Today</div>
+      <div class="tab" data-view="reference">Reference</div>
+      <div class="tab" data-view="suggest">Suggest</div>
+      <div class="tab" data-view="calendar">Calendar</div>
+      <div class="tab" data-view="gallery">Photos</div>
+      <div class="tab" data-view="stats">Stats</div>
+    </div>
   </div>
 
   <!-- SETUP (shown if no start date) -->
@@ -356,6 +369,18 @@
 
   <!-- TODAY VIEW -->
   <div class="view active" id="view-today">
+    <div class="card" id="weightPromptCard" style="display:none;">
+      <h2>Weekly Weigh-In — Day <span id="weightPromptDay"></span></h2>
+      <div style="display:flex; gap:8px; align-items:flex-end;">
+        <div style="flex:1;">
+          <label style="display:block; font-size:10px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); margin-bottom:4px;">Weight (lbs)</label>
+          <input type="number" step="0.1" inputmode="decimal" class="suggest-input" id="weightInput" placeholder="0.0" style="margin-bottom:0;">
+        </div>
+        <button class="btn btn-primary" id="logWeightBtn" style="width:auto; flex-shrink:0; padding:12px 20px;">Log</button>
+      </div>
+      <button class="btn btn-ghost" id="skipWeightBtn" style="margin-top:10px;">Skip This Check-In</button>
+    </div>
+
     <div class="card" id="todayCard" style="display:none;">
       <h2>Day <span id="dayNum"></span> Checklist</h2>
       <div id="taskList"></div>
@@ -464,6 +489,17 @@
         <div class="stat"><div class="n">-</div><div class="l">Calories Logged</div></div>
         <div class="stat"><div class="n">-</div><div class="l">Protein Logged</div></div>
       </div>
+    </div>
+    <div class="card">
+      <h2>Weight Log</h2>
+      <div style="display:flex; gap:8px; align-items:flex-end; margin-bottom:14px;">
+        <div style="flex:1;">
+          <label style="display:block; font-size:10px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); margin-bottom:4px;">Log for today (lbs)</label>
+          <input type="number" step="0.1" inputmode="decimal" class="suggest-input" id="manualWeightInput" placeholder="0.0" style="margin-bottom:0;">
+        </div>
+        <button class="btn btn-primary" id="manualLogWeightBtn" style="width:auto; flex-shrink:0; padding:12px 20px;">Log</button>
+      </div>
+      <div id="weightLogList"><p class="msg">No weigh-ins yet.</p></div>
     </div>
     <div class="card">
       <h2>Attempt History</h2>
@@ -773,6 +809,7 @@ function render(){
   renderCalendar();
   renderStats();
   renderMeals();
+  renderWeightPrompt();
 }
 
 function toggleTask(key){
@@ -885,6 +922,7 @@ async function wipeAll(){
     await window.storage.delete('dietRules').catch(()=>{});
     await window.storage.delete('quickRef').catch(()=>{});
     await window.storage.delete('suggestHistory').catch(()=>{});
+    await window.storage.delete('weightLog').catch(()=>{});
   }catch(e){ /* nothing to clear */ }
   state = defaultState();
   await saveState();
@@ -999,7 +1037,7 @@ async function renderPhotoBlock(){
           ${photo ? `<img src="${photo}" class="photo-thumb">` : ''}
           <div class="photo-actions">
             <label class="btn btn-ghost photo-btn">${photo ? 'Retake' : 'Take / Upload'}
-              <input type="file" accept="image/*" capture="environment" id="photoInput" style="display:none;">
+              <input type="file" accept="image/*" id="photoInput" style="display:none;">
             </label>
             ${photo ? '<button class="btn btn-ghost photo-btn" id="removePhotoBtn">Remove</button>' : ''}
           </div>
@@ -1528,6 +1566,101 @@ function closeDayDetail(){
   document.getElementById('dayDetailModal').classList.remove('show');
 }
 
+function isWeightCheckpoint(dayIndex){
+  return ((dayIndex - 1) % 7 === 0) || dayIndex === TOTAL_DAYS;
+}
+
+async function loadWeightLog(){
+  try{
+    const res = await window.storage.get('weightLog');
+    return res && res.value ? JSON.parse(res.value) : [];
+  }catch(e){ return []; }
+}
+
+async function saveWeightLog(list){
+  try{ await window.storage.set('weightLog', JSON.stringify(list)); }catch(e){ console.error(e); }
+}
+
+async function upsertWeightEntry(dayIndex, weightLbs, skipped){
+  const log = await loadWeightLog();
+  const existingIdx = log.findIndex(e => e.day === dayIndex);
+  const entry = { day: dayIndex, date: todayISO(), weightLbs: skipped ? null : weightLbs, skipped: !!skipped };
+  if(existingIdx >= 0) log[existingIdx] = entry;
+  else log.push(entry);
+  log.sort((a,b) => a.day - b.day);
+  await saveWeightLog(log);
+}
+
+async function renderWeightPrompt(){
+  const card = document.getElementById('weightPromptCard');
+  if(!state.startDate){ card.style.display = 'none'; return; }
+
+  const dayIndex = state.currentDayIndex;
+  if(!isWeightCheckpoint(dayIndex)){ card.style.display = 'none'; return; }
+
+  const log = await loadWeightLog();
+  const already = log.find(e => e.day === dayIndex);
+  if(already){ card.style.display = 'none'; return; }
+
+  document.getElementById('weightPromptDay').textContent = dayIndex;
+  document.getElementById('weightInput').value = '';
+  card.style.display = 'block';
+}
+
+async function handleLogWeight(){
+  const val = parseFloat(document.getElementById('weightInput').value);
+  if(!val || val <= 0){ showToast('Enter a weight first'); return; }
+  await upsertWeightEntry(state.currentDayIndex, val, false);
+  showToast('Weight logged');
+  document.getElementById('weightPromptCard').style.display = 'none';
+  renderWeightLog();
+}
+
+async function handleSkipWeight(){
+  await upsertWeightEntry(state.currentDayIndex, null, true);
+  document.getElementById('weightPromptCard').style.display = 'none';
+  renderWeightLog();
+}
+
+async function handleManualLogWeight(){
+  const val = parseFloat(document.getElementById('manualWeightInput').value);
+  if(!val || val <= 0){ showToast('Enter a weight first'); return; }
+  await upsertWeightEntry(state.currentDayIndex, val, false);
+  document.getElementById('manualWeightInput').value = '';
+  showToast('Weight logged for Day ' + state.currentDayIndex);
+  renderWeightLog();
+  renderWeightPrompt(); // hide the checkpoint prompt if it was showing for today
+}
+
+async function renderWeightLog(){
+  const container = document.getElementById('weightLogList');
+  if(!container) return;
+  const log = await loadWeightLog();
+  if(log.length === 0){
+    container.innerHTML = '<p class="msg">No weigh-ins yet.</p>';
+    return;
+  }
+
+  const firstReal = log.find(e => !e.skipped);
+  container.innerHTML = '';
+  log.slice().reverse().forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'history-item';
+    let right;
+    if(entry.skipped){
+      right = '<span class="d">Skipped</span>';
+    } else {
+      const delta = firstReal && entry.day !== firstReal.day
+        ? (entry.weightLbs - firstReal.weightLbs)
+        : null;
+      const deltaStr = delta === null ? '' : (delta > 0 ? ` (+${delta.toFixed(1)})` : delta < 0 ? ` (${delta.toFixed(1)})` : ' (—)');
+      right = `<span>${entry.weightLbs.toFixed(1)} lbs${deltaStr}</span>`;
+    }
+    row.innerHTML = `<span class="d">Day ${entry.day} · ${entry.date}</span>${right}`;
+    container.appendChild(row);
+  });
+}
+
 function setupTabs(){
   document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -1538,7 +1671,7 @@ function setupTabs(){
       if(tab.dataset.view === 'gallery') renderGallery();
       if(tab.dataset.view === 'reference') renderReference();
       if(tab.dataset.view === 'suggest') renderSuggestHistory();
-      if(tab.dataset.view === 'stats') renderLifetimeStats();
+      if(tab.dataset.view === 'stats'){ renderLifetimeStats(); renderWeightLog(); }
     });
   });
 }
@@ -1562,6 +1695,9 @@ async function init(){
   document.getElementById('mealInput').addEventListener('change', handleMealPhotoAttach);
   document.getElementById('saveMealBtn').addEventListener('click', handleSaveMeal);
   document.getElementById('saveSuggestBtn').addEventListener('click', handleSaveSuggestion);
+  document.getElementById('logWeightBtn').addEventListener('click', handleLogWeight);
+  document.getElementById('skipWeightBtn').addEventListener('click', handleSkipWeight);
+  document.getElementById('manualLogWeightBtn').addEventListener('click', handleManualLogWeight);
   document.getElementById('menuPhotoInput').addEventListener('change', handleMenuPhotoSelect);
   document.getElementById('dayDetailClose').addEventListener('click', closeDayDetail);
   document.getElementById('dayDetailModal').addEventListener('click', (e) => {
