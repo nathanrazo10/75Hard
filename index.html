@@ -392,6 +392,19 @@
     </div>
 
     <div class="card" id="mealsCard" style="display:none;">
+      <h2>Calorie Deficit Check</h2>
+      <div class="macro-summary" id="deficitSummary"></div>
+      <div style="display:flex; gap:8px; align-items:flex-end;">
+        <div style="flex:1;">
+          <label style="display:block; font-size:10px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); margin-bottom:4px;">Calories Burned Today (Apple Fitness)</label>
+          <input type="number" inputmode="numeric" class="suggest-input" id="caloriesBurnedInput" placeholder="e.g. 2400" style="margin-bottom:0;">
+        </div>
+        <button class="btn btn-ghost" id="saveCaloriesBurnedBtn" style="width:auto; flex-shrink:0; padding:12px 16px;">Save</button>
+      </div>
+      <p class="disclaimer">Ask Claude to read your Apple Fitness screenshot in a separate chat, then enter the total burned here.</p>
+    </div>
+
+    <div class="card" id="mealsListCard" style="display:none;">
       <h2>Meals Today</h2>
       <div class="macro-summary" id="macroSummary"></div>
       <p class="disclaimer" style="margin-top:0; margin-bottom:14px;">Ask Claude in a separate chat to estimate calories/macros from a meal photo, then log the numbers here.</p>
@@ -525,6 +538,20 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="dayWrapModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h2>Day Wrap-Up</h2>
+      <button class="modal-close" id="dayWrapCloseX">✕</button>
+    </div>
+    <div id="dayWrapBody"></div>
+    <div class="modal-btn-row">
+      <button class="btn btn-ghost" id="dayWrapGoBack">Go Back</button>
+      <button class="btn btn-primary" id="dayWrapConfirm">Lock It In</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="resetConfirmModal">
   <div class="modal-sheet">
     <div class="modal-header">
@@ -654,6 +681,7 @@ function emptyTasks(){
   t.waterOz = 0;
   t.note = '';
   t.photo = false;
+  t.caloriesBurned = null;
   return t;
 }
 
@@ -714,6 +742,7 @@ function render(){
   document.getElementById('setupCard').style.display = hasStarted ? 'none' : 'block';
   document.getElementById('todayCard').style.display = hasStarted ? 'block' : 'none';
   document.getElementById('mealsCard').style.display = hasStarted ? 'block' : 'none';
+  document.getElementById('mealsListCard').style.display = hasStarted ? 'block' : 'none';
 
   if(!hasStarted){
     document.getElementById('headerCount').innerHTML = `<div class="big-count"><span class="num">DAY 0</span><span class="of">/ 75</span></div>`;
@@ -836,6 +865,47 @@ async function completeDay(){
   const tasks = getCurrentDayTasks();
   const allDone = TASK_DEFS.every(d => tasks[d.key]) && tasks.waterOz >= GALLON_OZ && tasks.photo;
   if(!allDone) return;
+  await openDayWrapSummary();
+}
+
+async function openDayWrapSummary(){
+  const dayIndex = state.currentDayIndex;
+  const tasks = state.days[dayIndex] || {};
+  const meals = await loadMealsForDay(dayIndex);
+
+  const consumed = meals.reduce((sum, m) => sum + (m.calories || 0), 0);
+  const burned = tasks.caloriesBurned;
+  const hasLateMeal = meals.some(m => m.time && m.time >= '21:00');
+
+  let netLine = '';
+  if(burned){
+    const net = burned - consumed;
+    netLine = net >= 0
+      ? `<div class="detail-row">✅ Deficit of ${net} calories (${burned} burned − ${consumed} consumed)</div>`
+      : `<div class="detail-row">⚠️ Surplus of ${Math.abs(net)} calories (${burned} burned − ${consumed} consumed)</div>`;
+  } else {
+    netLine = `<div class="detail-row">— No calories-burned number entered today (consumed: ${consumed})</div>`;
+  }
+
+  const lateLine = hasLateMeal
+    ? `<div class="detail-row">⚠️ At least one meal logged after 9pm</div>`
+    : `<div class="detail-row">✅ No meals logged after 9pm</div>`;
+
+  document.getElementById('dayWrapBody').innerHTML = `
+    <p class="msg" style="text-align:left; margin-bottom:12px;">Here's today's diet check before you lock in Day ${dayIndex}:</p>
+    ${netLine}
+    ${lateLine}
+  `;
+  document.getElementById('dayWrapModal').classList.add('show');
+}
+
+function closeDayWrapSummary(){
+  document.getElementById('dayWrapModal').classList.remove('show');
+}
+
+async function performCompleteDay(){
+  closeDayWrapSummary();
+  const tasks = getCurrentDayTasks();
 
   const justFinishedDay = state.currentDayIndex;
   state.completedDays[justFinishedDay] = true;
@@ -1219,6 +1289,7 @@ async function renderMeals(){
   if(!state.startDate) return;
   const dayIndex = state.currentDayIndex;
   const meals = await loadMealsForDay(dayIndex);
+  const tasks = state.days[dayIndex] || {};
 
   const totals = meals.reduce((acc, m) => {
     acc.calories += m.calories; acc.protein_g += m.protein_g;
@@ -1233,6 +1304,32 @@ async function renderMeals(){
     <div class="macro-pill"><div class="v">${totals.fat_g}g</div><div class="l">Fat</div></div>
   `;
 
+  // Deficit check card
+  const burned = tasks.caloriesBurned;
+  const burnedInput = document.getElementById('caloriesBurnedInput');
+  if(burnedInput && document.activeElement !== burnedInput){
+    burnedInput.value = burned || '';
+  }
+  const deficitSummary = document.getElementById('deficitSummary');
+  if(deficitSummary){
+    if(burned){
+      const net = burned - totals.calories;
+      const netLabel = net >= 0 ? `-${net}` : `+${Math.abs(net)}`;
+      const netColor = net >= 0 ? 'var(--done)' : 'var(--danger)';
+      deficitSummary.innerHTML = `
+        <div class="macro-pill"><div class="v">${totals.calories}</div><div class="l">Consumed</div></div>
+        <div class="macro-pill"><div class="v">${burned}</div><div class="l">Burned</div></div>
+        <div class="macro-pill"><div class="v" style="color:${netColor};">${netLabel}</div><div class="l">${net >= 0 ? 'Deficit' : 'Surplus'}</div></div>
+      `;
+    } else {
+      deficitSummary.innerHTML = `
+        <div class="macro-pill"><div class="v">${totals.calories}</div><div class="l">Consumed</div></div>
+        <div class="macro-pill"><div class="v">—</div><div class="l">Burned</div></div>
+        <div class="macro-pill"><div class="v">—</div><div class="l">Net</div></div>
+      `;
+    }
+  }
+
   const list = document.getElementById('mealsList');
   if(meals.length === 0){
     list.innerHTML = '<p class="msg">No meals logged yet today.</p>';
@@ -1241,10 +1338,11 @@ async function renderMeals(){
     meals.slice().reverse().forEach(m => {
       const row = document.createElement('div');
       row.className = 'meal-item';
+      const isLate = m.time && m.time >= '21:00';
       row.innerHTML = `
         ${m.photo ? `<img src="${m.photo}" class="meal-thumb">` : '<div class="meal-thumb" style="display:flex;align-items:center;justify-content:center;font-size:20px;">🍽️</div>'}
         <div class="meal-body">
-          <div class="meal-desc">${m.description} <span style="color:var(--muted); font-weight:400;">· ${m.time}</span></div>
+          <div class="meal-desc">${m.description} <span style="color:var(--muted); font-weight:400;">· ${m.time}</span>${isLate ? ' <span style="color:var(--danger); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em;">⚠ after 9pm</span>' : ''}</div>
           <div class="meal-macros"><b>${m.calories}</b> cal &nbsp; <b>${m.protein_g}g</b> protein &nbsp; <b>${m.carbs_g}g</b> carb &nbsp; <b>${m.fat_g}g</b> fat</div>
           <div class="meal-note">${m.wellness_note}</div>
         </div>
@@ -1566,6 +1664,16 @@ function closeDayDetail(){
   document.getElementById('dayDetailModal').classList.remove('show');
 }
 
+async function handleSaveCaloriesBurned(){
+  const val = parseInt(document.getElementById('caloriesBurnedInput').value, 10);
+  if(!val || val <= 0){ showToast('Enter a calories burned number first'); return; }
+  const tasks = getCurrentDayTasks();
+  tasks.caloriesBurned = val;
+  await saveState();
+  showToast('Saved');
+  renderMeals();
+}
+
 function isWeightCheckpoint(dayIndex){
   return ((dayIndex - 1) % 7 === 0) || dayIndex === TOTAL_DAYS;
 }
@@ -1698,6 +1806,13 @@ async function init(){
   document.getElementById('logWeightBtn').addEventListener('click', handleLogWeight);
   document.getElementById('skipWeightBtn').addEventListener('click', handleSkipWeight);
   document.getElementById('manualLogWeightBtn').addEventListener('click', handleManualLogWeight);
+  document.getElementById('saveCaloriesBurnedBtn').addEventListener('click', handleSaveCaloriesBurned);
+  document.getElementById('dayWrapConfirm').addEventListener('click', performCompleteDay);
+  document.getElementById('dayWrapGoBack').addEventListener('click', closeDayWrapSummary);
+  document.getElementById('dayWrapCloseX').addEventListener('click', closeDayWrapSummary);
+  document.getElementById('dayWrapModal').addEventListener('click', (e) => {
+    if(e.target.id === 'dayWrapModal') closeDayWrapSummary();
+  });
   document.getElementById('menuPhotoInput').addEventListener('change', handleMenuPhotoSelect);
   document.getElementById('dayDetailClose').addEventListener('click', closeDayDetail);
   document.getElementById('dayDetailModal').addEventListener('click', (e) => {
