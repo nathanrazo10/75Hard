@@ -506,12 +506,17 @@
     <div class="card">
       <h2>Weight Log</h2>
       <div style="display:flex; gap:8px; align-items:flex-end; margin-bottom:14px;">
+        <div style="flex:0 0 70px;">
+          <label style="display:block; font-size:10px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); margin-bottom:4px;">Day</label>
+          <input type="number" min="1" max="75" class="suggest-input" id="manualWeightDay" placeholder="1" style="margin-bottom:0;">
+        </div>
         <div style="flex:1;">
-          <label style="display:block; font-size:10px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); margin-bottom:4px;">Log for today (lbs)</label>
+          <label style="display:block; font-size:10px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); margin-bottom:4px;">Weight (lbs)</label>
           <input type="number" step="0.1" inputmode="decimal" class="suggest-input" id="manualWeightInput" placeholder="0.0" style="margin-bottom:0;">
         </div>
-        <button class="btn btn-primary" id="manualLogWeightBtn" style="width:auto; flex-shrink:0; padding:12px 20px;">Log</button>
+        <button class="btn btn-primary" id="manualLogWeightBtn" style="width:auto; flex-shrink:0; padding:12px 20px;">Save</button>
       </div>
+      <p class="disclaimer" style="margin-top:0; margin-bottom:12px;">Set the day number to add or edit any entry — including backfilling Day 1 if you missed weighing in.</p>
       <div id="weightLogList"><p class="msg">No weigh-ins yet.</p></div>
     </div>
     <div class="card">
@@ -1692,7 +1697,8 @@ async function saveWeightLog(list){
 async function upsertWeightEntry(dayIndex, weightLbs, skipped){
   const log = await loadWeightLog();
   const existingIdx = log.findIndex(e => e.day === dayIndex);
-  const entry = { day: dayIndex, date: todayISO(), weightLbs: skipped ? null : weightLbs, skipped: !!skipped };
+  const entryDate = dateForDayIndex(dayIndex) || todayISO();
+  const entry = { day: dayIndex, date: entryDate, weightLbs: skipped ? null : weightLbs, skipped: !!skipped };
   if(existingIdx >= 0) log[existingIdx] = entry;
   else log.push(entry);
   log.sort((a,b) => a.day - b.day);
@@ -1730,14 +1736,50 @@ async function handleSkipWeight(){
   renderWeightLog();
 }
 
+let editingWeightDay = null;
+
 async function handleManualLogWeight(){
+  const dayField = document.getElementById('manualWeightDay');
+  const targetDay = parseInt(dayField.value, 10) || state.currentDayIndex;
   const val = parseFloat(document.getElementById('manualWeightInput').value);
+
+  if(targetDay < 1 || targetDay > TOTAL_DAYS){ showToast('Day must be between 1 and 75'); return; }
   if(!val || val <= 0){ showToast('Enter a weight first'); return; }
-  await upsertWeightEntry(state.currentDayIndex, val, false);
+
+  // If editing an existing entry and the day changed, remove the old one first
+  if(editingWeightDay !== null && editingWeightDay !== targetDay){
+    const log = await loadWeightLog();
+    await saveWeightLog(log.filter(e => e.day !== editingWeightDay));
+  }
+
+  await upsertWeightEntry(targetDay, val, false);
+  editingWeightDay = null;
+  dayField.value = '';
   document.getElementById('manualWeightInput').value = '';
-  showToast('Weight logged for Day ' + state.currentDayIndex);
+  showToast('Weight saved for Day ' + targetDay);
   renderWeightLog();
   renderWeightPrompt(); // hide the checkpoint prompt if it was showing for today
+}
+
+function startEditWeight(day, weightLbs){
+  editingWeightDay = day;
+  document.getElementById('manualWeightDay').value = day;
+  document.getElementById('manualWeightInput').value = weightLbs;
+  document.getElementById('manualWeightInput').focus();
+  showToast('Editing Day ' + day + ' — change values and tap Save');
+}
+
+async function deleteWeightEntry(day){
+  const log = await loadWeightLog();
+  await saveWeightLog(log.filter(e => e.day !== day));
+  if(editingWeightDay === day){
+    editingWeightDay = null;
+    document.getElementById('manualWeightDay').value = '';
+    document.getElementById('manualWeightInput').value = '';
+  }
+  showToast('Deleted Day ' + day + ' entry');
+  renderWeightLog();
+  renderWeightPrompt();
 }
 
 async function renderWeightLog(){
@@ -1754,18 +1796,33 @@ async function renderWeightLog(){
   log.slice().reverse().forEach(entry => {
     const row = document.createElement('div');
     row.className = 'history-item';
-    let right;
+    row.style.alignItems = 'center';
+    let weightPart;
     if(entry.skipped){
-      right = '<span class="d">Skipped</span>';
+      weightPart = '<span class="d">Skipped</span>';
     } else {
       const delta = firstReal && entry.day !== firstReal.day
         ? (entry.weightLbs - firstReal.weightLbs)
         : null;
       const deltaStr = delta === null ? '' : (delta > 0 ? ` (+${delta.toFixed(1)})` : delta < 0 ? ` (${delta.toFixed(1)})` : ' (—)');
-      right = `<span>${entry.weightLbs.toFixed(1)} lbs${deltaStr}</span>`;
+      weightPart = `<span>${entry.weightLbs.toFixed(1)} lbs${deltaStr}</span>`;
     }
-    row.innerHTML = `<span class="d">Day ${entry.day} · ${entry.date}</span>${right}`;
+    row.innerHTML = `
+      <span class="d">Day ${entry.day} · ${entry.date}</span>
+      <span style="display:flex; align-items:center; gap:10px;">
+        ${weightPart}
+        ${!entry.skipped ? `<button class="meal-del" data-edit-day="${entry.day}" data-edit-weight="${entry.weightLbs}" style="font-size:14px;">✎</button>` : ''}
+        <button class="meal-del" data-delete-day="${entry.day}">✕</button>
+      </span>
+    `;
     container.appendChild(row);
+  });
+
+  container.querySelectorAll('[data-edit-day]').forEach(btn => {
+    btn.addEventListener('click', () => startEditWeight(parseInt(btn.dataset.editDay, 10), parseFloat(btn.dataset.editWeight)));
+  });
+  container.querySelectorAll('[data-delete-day]').forEach(btn => {
+    btn.addEventListener('click', () => deleteWeightEntry(parseInt(btn.dataset.deleteDay, 10)));
   });
 }
 
