@@ -490,7 +490,7 @@
       <div class="stat"><div class="n" id="statCurrentDay">-</div><div class="l">Current Day</div></div>
       <div class="stat"><div class="n" id="statStreak">-</div><div class="l">Days Completed</div></div>
       <div class="stat"><div class="n" id="statAttempts">-</div><div class="l">Attempts</div></div>
-      <div class="stat"><div class="n" id="statPct">-</div><div class="l">This Run Adherence</div></div>
+      <div class="stat"><div class="n" id="statAvgDeficit">-</div><div class="l">Avg Daily Deficit</div></div>
     </div>
     <div class="card">
       <h2>Totals This Attempt</h2>
@@ -1030,8 +1030,7 @@ function renderStats(){
   document.getElementById('statCurrentDay').textContent = state.startDate ? state.currentDayIndex : '—';
   document.getElementById('statStreak').textContent = completedCount;
   document.getElementById('statAttempts').textContent = state.attempts.length + (state.startDate ? 1 : 0);
-  const pct = state.startDate ? Math.round((completedCount / Math.max(1,(state.currentDayIndex))) * 100) : 0;
-  document.getElementById('statPct').textContent = state.startDate ? pct + '%' : '—';
+  renderAvgDeficit();
 
   const list = document.getElementById('historyList');
   if(state.attempts.length === 0){
@@ -1046,6 +1045,34 @@ function renderStats(){
       list.appendChild(row);
     });
   }
+}
+
+async function renderAvgDeficit(){
+  const el = document.getElementById('statAvgDeficit');
+  if(!el) return;
+  if(!state.startDate){ el.textContent = '—'; return; }
+
+  const dayIndices = Object.keys(state.days).map(Number);
+  let deficitSum = 0;
+  let daysWithData = 0;
+
+  for(const idx of dayIndices){
+    const tasks = state.days[idx];
+    if(!tasks || !tasks.caloriesBurned) continue; // only count days with a burned number entered
+    const meals = await loadMealsForDay(idx);
+    const consumed = meals.reduce((sum, m) => sum + (m.calories || 0), 0);
+    deficitSum += (tasks.caloriesBurned - consumed);
+    daysWithData++;
+  }
+
+  if(daysWithData === 0){
+    el.textContent = '—';
+    return;
+  }
+
+  const avg = Math.round(deficitSum / daysWithData);
+  el.textContent = (avg >= 0 ? '-' : '+') + Math.abs(avg);
+  el.style.color = avg >= 0 ? 'var(--done)' : 'var(--danger)';
 }
 
 function compressImage(file, maxDim=900, quality=0.7){
