@@ -401,7 +401,11 @@
         </div>
         <button class="btn btn-ghost" id="saveCaloriesBurnedBtn" style="width:auto; flex-shrink:0; padding:12px 16px;">Save</button>
       </div>
-      <p class="disclaimer">Ask Claude to read your Apple Fitness screenshot in a separate chat, then enter the total burned here.</p>
+      <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:var(--muted); cursor:pointer;">
+        <input type="checkbox" id="caloriesConfirmedCheck" style="width:16px; height:16px;">
+        This is the final full-day total (not a partial mid-day number)
+      </label>
+      <p class="disclaimer">Ask Claude to read your Apple Fitness screenshot in a separate chat, then enter the total burned here. You can come back and edit/confirm this — or any past day's number — anytime from the Calendar tab.</p>
     </div>
 
     <div class="card" id="mealsListCard" style="display:none;">
@@ -687,6 +691,7 @@ function emptyTasks(){
   t.note = '';
   t.photo = false;
   t.caloriesBurned = null;
+  t.caloriesBurnedConfirmed = false;
   return t;
 }
 
@@ -1342,15 +1347,21 @@ async function renderMeals(){
   if(burnedInput && document.activeElement !== burnedInput){
     burnedInput.value = burned || '';
   }
+  const confirmedCheck = document.getElementById('caloriesConfirmedCheck');
+  if(confirmedCheck){
+    confirmedCheck.checked = !!tasks.caloriesBurnedConfirmed;
+  }
   const deficitSummary = document.getElementById('deficitSummary');
   if(deficitSummary){
     if(burned){
       const net = burned - totals.calories;
       const netLabel = net >= 0 ? `-${net}` : `+${Math.abs(net)}`;
       const netColor = net >= 0 ? 'var(--done)' : 'var(--danger)';
+      const unconfirmedTag = !tasks.caloriesBurnedConfirmed
+        ? '<div style="font-size:9px; color:var(--danger); margin-top:2px; text-transform:uppercase; letter-spacing:0.03em;">⚠ unconfirmed</div>' : '';
       deficitSummary.innerHTML = `
         <div class="macro-pill"><div class="v">${totals.calories}</div><div class="l">Consumed</div></div>
-        <div class="macro-pill"><div class="v">${burned}</div><div class="l">Burned</div></div>
+        <div class="macro-pill"><div class="v">${burned}</div><div class="l">Burned</div>${unconfirmedTag}</div>
         <div class="macro-pill"><div class="v" style="color:${netColor};">${netLabel}</div><div class="l">${net >= 0 ? 'Deficit' : 'Surplus'}</div></div>
       `;
     } else {
@@ -1670,6 +1681,32 @@ async function openDayDetail(dayIndex){
     html += `<div class="detail-note">"${tasks.note}"</div>`;
   }
 
+  const dayConsumed = meals.reduce((sum, m) => sum + (m.calories || 0), 0);
+  const dayBurned = tasks.caloriesBurned;
+  html += '<div class="detail-subhead">Calorie Deficit Check</div>';
+  html += `<div class="detail-row">Consumed: <b>${dayConsumed}</b> cal</div>`;
+  if(dayBurned){
+    const net = dayBurned - dayConsumed;
+    const netLabel = net >= 0 ? `-${net} deficit` : `+${Math.abs(net)} surplus`;
+    html += `<div class="detail-row">Burned: <b>${dayBurned}</b> cal &nbsp; (${netLabel})</div>`;
+    html += `<div class="detail-row">${tasks.caloriesBurnedConfirmed ? '✅ Confirmed final total' : '⚠️ Not yet confirmed — may be a partial/mid-day number'}</div>`;
+  } else {
+    html += `<div class="detail-row" style="color:var(--muted);">No calories-burned number entered for this day.</div>`;
+  }
+  html += `
+    <div style="display:flex; gap:8px; align-items:flex-end; margin-top:10px;">
+      <div style="flex:1;">
+        <label style="display:block; font-size:10px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); margin-bottom:4px;">Edit Calories Burned</label>
+        <input type="number" inputmode="numeric" class="suggest-input" id="dayDetailBurnedInput" value="${dayBurned || ''}" placeholder="e.g. 2400" style="margin-bottom:0;">
+      </div>
+      <button class="btn btn-ghost" id="dayDetailSaveBurnedBtn" style="width:auto; flex-shrink:0; padding:12px 16px;">Save</button>
+    </div>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:var(--muted); cursor:pointer;">
+      <input type="checkbox" id="dayDetailConfirmedCheck" style="width:16px; height:16px;" ${tasks.caloriesBurnedConfirmed ? 'checked' : ''}>
+      This is the final full-day total
+    </label>
+  `;
+
   if(photo){
     html += `<img src="${photo}" class="photo-thumb" style="max-width:180px; margin-top:12px;">`;
   }
@@ -1690,20 +1727,60 @@ async function openDayDetail(dayIndex){
   }
 
   body.innerHTML = html;
+
+  const saveBurnedBtn = document.getElementById('dayDetailSaveBurnedBtn');
+  if(saveBurnedBtn){
+    saveBurnedBtn.addEventListener('click', async () => {
+      const val = parseInt(document.getElementById('dayDetailBurnedInput').value, 10);
+      if(!val || val <= 0){ showToast('Enter a calories burned number first'); return; }
+      const confirmed = document.getElementById('dayDetailConfirmedCheck').checked;
+      await saveCaloriesBurnedForDay(dayIndex, val, confirmed);
+      showToast('Day ' + dayIndex + ' updated');
+      openDayDetail(dayIndex); // re-render with fresh numbers
+      renderMeals();
+      renderAvgDeficit();
+    });
+  }
+
+  const confirmCheck = document.getElementById('dayDetailConfirmedCheck');
+  if(confirmCheck){
+    confirmCheck.addEventListener('change', async () => {
+      if(!state.days[dayIndex]) state.days[dayIndex] = emptyTasks();
+      state.days[dayIndex].caloriesBurnedConfirmed = confirmCheck.checked;
+      await saveState();
+      showToast(confirmCheck.checked ? 'Marked confirmed' : 'Marked unconfirmed');
+      renderAvgDeficit();
+    });
+  }
 }
 
 function closeDayDetail(){
   document.getElementById('dayDetailModal').classList.remove('show');
 }
 
+async function saveCaloriesBurnedForDay(dayIndex, value, confirmed){
+  if(!state.days[dayIndex]) state.days[dayIndex] = emptyTasks();
+  state.days[dayIndex].caloriesBurned = value;
+  state.days[dayIndex].caloriesBurnedConfirmed = !!confirmed;
+  await saveState();
+}
+
 async function handleSaveCaloriesBurned(){
   const val = parseInt(document.getElementById('caloriesBurnedInput').value, 10);
   if(!val || val <= 0){ showToast('Enter a calories burned number first'); return; }
-  const tasks = getCurrentDayTasks();
-  tasks.caloriesBurned = val;
-  await saveState();
+  const confirmed = document.getElementById('caloriesConfirmedCheck').checked;
+  await saveCaloriesBurnedForDay(state.currentDayIndex, val, confirmed);
   showToast('Saved');
   renderMeals();
+  renderAvgDeficit();
+}
+
+async function handleToggleTodayConfirmed(){
+  const tasks = getCurrentDayTasks();
+  tasks.caloriesBurnedConfirmed = document.getElementById('caloriesConfirmedCheck').checked;
+  await saveState();
+  renderMeals();
+  renderAvgDeficit();
 }
 
 function isWeightCheckpoint(dayIndex){
@@ -1891,6 +1968,7 @@ async function init(){
   document.getElementById('skipWeightBtn').addEventListener('click', handleSkipWeight);
   document.getElementById('manualLogWeightBtn').addEventListener('click', handleManualLogWeight);
   document.getElementById('saveCaloriesBurnedBtn').addEventListener('click', handleSaveCaloriesBurned);
+  document.getElementById('caloriesConfirmedCheck').addEventListener('change', handleToggleTodayConfirmed);
   document.getElementById('dayWrapConfirm').addEventListener('click', performCompleteDay);
   document.getElementById('dayWrapGoBack').addEventListener('click', closeDayWrapSummary);
   document.getElementById('dayWrapCloseX').addEventListener('click', closeDayWrapSummary);
