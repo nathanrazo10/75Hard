@@ -1763,8 +1763,8 @@ async function openDayDetail(dayIndex){
     html += `<img src="${photo}" class="photo-thumb" style="max-width:180px; margin-top:12px;">`;
   }
 
+  html += '<div class="detail-subhead">Meals</div>';
   if(meals.length){
-    html += '<div class="detail-subhead">Meals</div>';
     meals.forEach(m => {
       html += `
         <div class="meal-item">
@@ -1777,11 +1777,76 @@ async function openDayDetail(dayIndex){
             <div class="meal-macros"><b>${m.calories}</b> cal &nbsp; <b>${m.protein_g}g</b> protein &nbsp; <b>${m.carbs_g}g</b> carb &nbsp; <b>${m.fat_g}g</b> fat</div>
             <div class="meal-note">${m.wellness_note}</div>
           </div>
+          <button class="meal-del" data-delete-meal-id="${m.id}">✕</button>
         </div>`;
+    });
+  } else {
+    html += '<p class="msg">No meals logged for this day.</p>';
+  }
+
+  html += `
+    <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
+      <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.05em; color:var(--ember); font-weight:600; margin-bottom:10px;">+ Add a Meal to This Day</div>
+      <input type="text" class="suggest-input" id="backfillMealDesc" placeholder="What was it?">
+      <div style="margin-bottom:10px;">
+        <label style="display:block; font-size:10px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); margin-bottom:4px;">Time</label>
+        <input type="time" class="suggest-input" id="backfillMealTime" value="${new Date().toTimeString().slice(0,5)}" style="margin-bottom:0;">
+      </div>
+      <div class="macro-input-row">
+        <div class="macro-input"><label>Calories</label><input type="number" inputmode="numeric" id="backfillMealCalories" placeholder="0"></div>
+        <div class="macro-input"><label>Protein g</label><input type="number" inputmode="numeric" id="backfillMealProtein" placeholder="0"></div>
+        <div class="macro-input"><label>Carbs g</label><input type="number" inputmode="numeric" id="backfillMealCarbs" placeholder="0"></div>
+        <div class="macro-input"><label>Fat g</label><input type="number" inputmode="numeric" id="backfillMealFat" placeholder="0"></div>
+      </div>
+      <textarea id="backfillMealNote" placeholder="Notes (optional)"></textarea>
+      <button class="btn btn-primary" id="backfillMealSaveBtn" style="margin-top:10px;">Add Meal to Day ${dayIndex}</button>
+    </div>
+  `;
+
+  body.innerHTML = html;
+
+  const backfillBtn = document.getElementById('backfillMealSaveBtn');
+  if(backfillBtn){
+    backfillBtn.addEventListener('click', async () => {
+      const desc = document.getElementById('backfillMealDesc').value.trim();
+      const time = document.getElementById('backfillMealTime').value || new Date().toTimeString().slice(0,5);
+      const calories = Number(document.getElementById('backfillMealCalories').value) || 0;
+      const protein = Number(document.getElementById('backfillMealProtein').value) || 0;
+      const carbs = Number(document.getElementById('backfillMealCarbs').value) || 0;
+      const fat = Number(document.getElementById('backfillMealFat').value) || 0;
+      const note = document.getElementById('backfillMealNote').value.trim();
+
+      if(!desc && !calories && !protein && !carbs && !fat){
+        showToast('Add a description or at least one number first');
+        return;
+      }
+
+      const mealsForDay = await loadMealsForDay(dayIndex);
+      mealsForDay.push({
+        id: Date.now().toString(36),
+        time, photo: null,
+        description: desc || 'Meal',
+        calories, protein_g: protein, carbs_g: carbs, fat_g: fat,
+        wellness_note: note,
+      });
+      await saveMealsForDay(dayIndex, mealsForDay);
+      showToast('Added to Day ' + dayIndex);
+      openDayDetail(dayIndex);
+      if(state.currentDayIndex === dayIndex) renderMeals();
+      renderAvgDeficit();
     });
   }
 
-  body.innerHTML = html;
+  body.querySelectorAll('[data-delete-meal-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const mealsForDay = await loadMealsForDay(dayIndex);
+      await saveMealsForDay(dayIndex, mealsForDay.filter(mm => mm.id !== btn.dataset.deleteMealId));
+      showToast('Meal removed');
+      openDayDetail(dayIndex);
+      if(state.currentDayIndex === dayIndex) renderMeals();
+      renderAvgDeficit();
+    });
+  });
 
   body.querySelectorAll('[data-meal-time-id]').forEach(input => {
     input.addEventListener('change', async () => {
