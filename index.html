@@ -541,6 +541,10 @@
       <div id="historyList"><p class="msg">No resets yet — first attempt in progress.</p></div>
     </div>
     <div class="card">
+      <h2>Weekly History</h2>
+      <div id="weeklyHistoryList"><p class="msg">No weeks yet.</p></div>
+    </div>
+    <div class="card">
       <h2>Danger Zone</h2>
       <button class="btn btn-ghost" id="wipeBtn">Wipe All Data &amp; Start Over</button>
     </div>
@@ -1183,6 +1187,64 @@ async function renderWeeklyDeficit(){
     }
     rowEl.innerHTML = `<span class="d">Day ${row.day}</span>${right}`;
     listEl.appendChild(rowEl);
+  });
+}
+
+async function computeWeekTotals(weekNum){
+  const weekStart = (weekNum - 1) * 7 + 1;
+  const weekEnd = Math.min(weekNum * 7, TOTAL_DAYS);
+  const lastDay = Math.min(weekEnd, state.currentDayIndex);
+
+  let consumed = 0, burnedSum = 0, netSum = 0, daysWithBurned = 0;
+
+  for(let d = weekStart; d <= lastDay; d++){
+    const tasks = state.days[d];
+    const meals = await loadMealsForDay(d);
+    const dayConsumed = meals.reduce((sum, m) => sum + (m.calories || 0), 0);
+    consumed += dayConsumed;
+    const burned = tasks ? tasks.caloriesBurned : null;
+    if(burned){
+      burnedSum += burned;
+      netSum += (burned - dayConsumed);
+      daysWithBurned++;
+    }
+  }
+
+  return { weekNum, weekStart, weekEnd, consumed, burnedSum, netSum, daysWithBurned };
+}
+
+async function renderWeeklyHistory(){
+  const container = document.getElementById('weeklyHistoryList');
+  if(!container) return;
+
+  if(!state.startDate){
+    container.innerHTML = '<p class="msg">No weeks yet.</p>';
+    return;
+  }
+
+  const currentWeekNum = Math.ceil(state.currentDayIndex / 7);
+  container.innerHTML = '<p class="msg">Loading\u2026</p>';
+
+  const weeks = [];
+  for(let w = 1; w <= currentWeekNum; w++){
+    weeks.push(await computeWeekTotals(w));
+  }
+
+  container.innerHTML = '';
+  weeks.slice().reverse().forEach(wk => {
+    const row = document.createElement('div');
+    row.className = 'history-item';
+    let right;
+    if(wk.daysWithBurned === 0){
+      right = '<span class="d">No data</span>';
+    } else {
+      const isDeficit = wk.netSum >= 0;
+      const color = isDeficit ? 'var(--done)' : 'var(--danger)';
+      right = `<span style="color:${color};">${(isDeficit ? '-' : '+') + Math.abs(Math.round(wk.netSum))} ${isDeficit ? 'deficit' : 'surplus'}</span>`;
+    }
+    const inProgressTag = wk.weekNum === currentWeekNum ? ' <i style="color:var(--muted);">(in progress)</i>' : '';
+    row.innerHTML = `<span class="d">Week ${wk.weekNum} \u00b7 Day ${wk.weekStart}\u2013${wk.weekEnd}${inProgressTag}</span>${right}`;
+    container.appendChild(row);
   });
 }
 
@@ -2172,7 +2234,7 @@ function setupTabs(){
       if(tab.dataset.view === 'gallery') renderGallery();
       if(tab.dataset.view === 'reference') renderReference();
       if(tab.dataset.view === 'suggest') renderSuggestHistory();
-      if(tab.dataset.view === 'stats'){ renderLifetimeStats(); renderWeightLog(); renderWeeklyDeficit(); }
+      if(tab.dataset.view === 'stats'){ renderLifetimeStats(); renderWeightLog(); renderWeeklyDeficit(); renderWeeklyHistory(); }
     });
   });
 }
