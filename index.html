@@ -351,11 +351,11 @@
   <div class="tabs-wrap">
     <div class="tabs">
       <div class="tab active" data-view="today">Today</div>
+      <div class="tab" data-view="stats">Stats</div>
       <div class="tab" data-view="reference">Reference</div>
       <div class="tab" data-view="suggest">Suggest</div>
       <div class="tab" data-view="calendar">Calendar</div>
       <div class="tab" data-view="gallery">Photos</div>
-      <div class="tab" data-view="stats">Stats</div>
     </div>
   </div>
 
@@ -502,6 +502,12 @@
       <div class="stat"><div class="n" id="statStreak">-</div><div class="l">Days Completed</div></div>
       <div class="stat"><div class="n" id="statAttempts">-</div><div class="l">Attempts</div></div>
       <div class="stat"><div class="n" id="statAvgDeficit">-</div><div class="l">Avg Daily Deficit</div></div>
+    </div>
+    <div class="card">
+      <h2>This Week <span id="weeklyRangeLabel" style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;"></span></h2>
+      <div class="macro-summary" id="weeklySummary"></div>
+      <p class="disclaimer" id="weeklyPaceNote" style="margin-top:0;"></p>
+      <div id="weeklyDayList"></div>
     </div>
     <div class="card">
       <h2>Totals This Attempt</h2>
@@ -1085,6 +1091,99 @@ async function renderAvgDeficit(){
   const avg = Math.round(deficitSum / daysWithData);
   el.textContent = (avg >= 0 ? '-' : '+') + Math.abs(avg);
   el.style.color = avg >= 0 ? 'var(--done)' : 'var(--danger)';
+}
+
+async function renderWeeklyDeficit(){
+  const rangeLabel = document.getElementById('weeklyRangeLabel');
+  const summaryEl = document.getElementById('weeklySummary');
+  const paceEl = document.getElementById('weeklyPaceNote');
+  const listEl = document.getElementById('weeklyDayList');
+  if(!summaryEl) return;
+
+  if(!state.startDate){
+    rangeLabel.textContent = '';
+    summaryEl.innerHTML = '';
+    paceEl.textContent = '';
+    listEl.innerHTML = '<p class="msg">Start your 75 to see weekly totals.</p>';
+    return;
+  }
+
+  const weekNum = Math.ceil(state.currentDayIndex / 7);
+  const weekStart = (weekNum - 1) * 7 + 1;
+  const weekEnd = Math.min(weekNum * 7, TOTAL_DAYS);
+  rangeLabel.textContent = `(Day ${weekStart}\u2013${weekEnd})`;
+
+  let weeklyConsumed = 0;
+  let weeklyBurnedSum = 0;
+  let netSum = 0;
+  let daysWithBurned = 0;
+  const dayRows = [];
+
+  for(let d = weekStart; d <= weekEnd; d++){
+    if(d > state.currentDayIndex){
+      dayRows.push({ day: d, status: 'future' });
+      continue;
+    }
+    const tasks = state.days[d];
+    const meals = await loadMealsForDay(d);
+    const consumed = meals.reduce((sum, m) => sum + (m.calories || 0), 0);
+    weeklyConsumed += consumed;
+    const burned = tasks ? tasks.caloriesBurned : null;
+
+    if(burned){
+      weeklyBurnedSum += burned;
+      netSum += (burned - consumed);
+      daysWithBurned++;
+    }
+
+    dayRows.push({
+      day: d,
+      status: d === state.currentDayIndex ? 'today' : 'done',
+      consumed, burned,
+      net: burned ? (burned - consumed) : null,
+    });
+  }
+
+  const netLabel = daysWithBurned > 0
+    ? ((netSum >= 0 ? '-' : '+') + Math.abs(Math.round(netSum)))
+    : '—';
+  const netColor = netSum >= 0 ? 'var(--done)' : 'var(--danger)';
+
+  summaryEl.innerHTML = `
+    <div class="macro-pill"><div class="v">${weeklyConsumed}</div><div class="l">Consumed</div></div>
+    <div class="macro-pill"><div class="v">${weeklyBurnedSum || '—'}</div><div class="l">Burned</div></div>
+    <div class="macro-pill"><div class="v" style="color:${netColor};">${netLabel}</div><div class="l">${netSum >= 0 ? 'Net Deficit' : 'Net Surplus'}</div></div>
+  `;
+
+  if(daysWithBurned > 0){
+    const avgDailyNet = netSum / daysWithBurned;
+    const weekLength = weekEnd - weekStart + 1;
+    const projected = Math.round(avgDailyNet * weekLength);
+    const projLabel = (projected >= 0 ? '-' : '+') + Math.abs(projected);
+    paceEl.textContent = `On pace for about ${projLabel} by Day ${weekEnd}, based on ${daysWithBurned} day${daysWithBurned === 1 ? '' : 's'} logged so far.`;
+  } else {
+    paceEl.textContent = 'Log calories burned on at least one day this week to see a pace projection.';
+  }
+
+  listEl.innerHTML = '';
+  dayRows.forEach(row => {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'history-item';
+    let right;
+    if(row.status === 'future'){
+      right = '<span class="d">—</span>';
+    } else if(row.status === 'today'){
+      right = '<span style="color:var(--ember); font-weight:600;">In progress</span>';
+    } else if(row.net === null){
+      right = '<span class="d">No burned data</span>';
+    } else {
+      const isDeficit = row.net >= 0;
+      const color = isDeficit ? 'var(--done)' : 'var(--danger)';
+      right = `<span style="color:${color};">${(isDeficit ? '-' : '+') + Math.abs(row.net)} ${isDeficit ? 'deficit' : 'surplus'}</span>`;
+    }
+    rowEl.innerHTML = `<span class="d">Day ${row.day}</span>${right}`;
+    listEl.appendChild(rowEl);
+  });
 }
 
 function compressImage(file, maxDim=900, quality=0.7){
@@ -2073,7 +2172,7 @@ function setupTabs(){
       if(tab.dataset.view === 'gallery') renderGallery();
       if(tab.dataset.view === 'reference') renderReference();
       if(tab.dataset.view === 'suggest') renderSuggestHistory();
-      if(tab.dataset.view === 'stats'){ renderLifetimeStats(); renderWeightLog(); }
+      if(tab.dataset.view === 'stats'){ renderLifetimeStats(); renderWeightLog(); renderWeeklyDeficit(); }
     });
   });
 }
