@@ -105,6 +105,12 @@
     font-size:14px; letter-spacing:0.08em; text-transform:uppercase;
     color:var(--muted); margin:0 0 14px; font-weight:600;
   }
+  .section-label{
+    font-family:var(--font-display);
+    font-size:13px; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--muted); margin:18px 0 8px; font-weight:600;
+  }
+  .section-label:first-child{ margin-top:0; }
   .btn{
     font-family:var(--font-display);
     text-transform:uppercase; letter-spacing:0.06em; font-weight:600;
@@ -185,6 +191,11 @@
     width:30px; height:30px; border-radius:8px; font-size:16px; cursor:pointer;
   }
   .detail-row{ display:flex; align-items:center; gap:8px; padding:6px 0; font-size:14px; }
+  .link-btn{
+    background:none; border:none; padding:0; margin:0;
+    color:var(--ember); font-family:var(--font-body); font-size:12px;
+    font-weight:600; text-decoration:underline; cursor:pointer;
+  }
   .detail-note{
     background:var(--surface-2); border:1px solid var(--line); border-radius:10px;
     padding:10px 12px; font-size:13px; font-style:italic; color:var(--muted); margin-top:10px;
@@ -338,6 +349,8 @@
   }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -545,6 +558,13 @@
       <div id="weeklyHistoryList"><p class="msg">No weeks yet.</p></div>
     </div>
     <div class="card">
+      <h2>Share Progress</h2>
+      <p class="disclaimer" style="margin-top:0;">Share a live, read-only view of your progress with one person (e.g. Kennedy). Requires a one-time Firebase setup — see the README notes in this file's comments if you haven't done that yet.</p>
+      <div id="shareStatusArea">
+        <button class="btn btn-primary" id="enableShareBtn">Turn On Sharing</button>
+      </div>
+    </div>
+    <div class="card">
       <h2>Danger Zone</h2>
       <button class="btn btn-ghost" id="wipeBtn">Wipe All Data &amp; Start Over</button>
     </div>
@@ -574,6 +594,19 @@
     <div class="modal-btn-row">
       <button class="btn btn-ghost" id="dayWrapGoBack">Go Back</button>
       <button class="btn btn-primary" id="dayWrapConfirm">Lock It In</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="completionModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h2>🏆 75 Days Complete</h2>
+      <button class="modal-close" id="completionCloseX">✕</button>
+    </div>
+    <div id="completionBody"></div>
+    <div class="modal-btn-row">
+      <button class="btn btn-primary" id="completionCloseBtn">Nice.</button>
     </div>
   </div>
 </div>
@@ -670,6 +703,49 @@
 
 /* Note: this single-file version skips the service worker / offline caching —
    that requires hosting manifest.json + service-worker.js alongside it. */
+
+/* ============================================================
+   SHARE SYNC (optional) — paste your own Firebase config below
+   to enable live sharing with one other person. Leave as-is to
+   skip this feature entirely; the app works fine without it.
+   Get this object from: Firebase Console > Project Settings >
+   Your apps > (</> icon) > Register app.
+   ============================================================ */
+const FIREBASE_CONFIG = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+let shareDb = null;
+let shareEnabled = false;
+let shareId = null;
+
+function isFirebaseConfigured(){
+  return FIREBASE_CONFIG.apiKey && !FIREBASE_CONFIG.apiKey.startsWith('YOUR_');
+}
+
+function initShareSync(){
+  if(!isFirebaseConfigured()) return;
+  try{
+    if(!firebase.apps || firebase.apps.length === 0){
+      firebase.initializeApp(FIREBASE_CONFIG);
+    }
+    shareDb = firebase.firestore();
+  }catch(e){
+    console.error('Firebase init failed', e);
+    shareDb = null;
+  }
+}
+
+function generateShareId(){
+  return 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'.replace(/x/g, () =>
+    Math.floor(Math.random() * 16).toString(16)
+  );
+}
 
 const TOTAL_DAYS = 75;
 const GALLON_OZ = 128;
@@ -866,6 +942,7 @@ function render(){
   renderStats();
   renderMeals();
   renderWeightPrompt();
+  pushShareSnapshot(); // fire-and-forget; no-op if sharing is off or unconfigured
 }
 
 function toggleTask(key){
@@ -939,15 +1016,18 @@ async function performCompleteDay(){
 
   if(state.currentDayIndex >= TOTAL_DAYS){
     // Finished the whole thing!
+    const summary = await buildCompletionSummaryData();
     state.attempts.push({
       startDate: state.startDate,
       endDate: todayISO(),
       resultDayReached: TOTAL_DAYS,
-      outcome: 'finished'
+      outcome: 'finished',
+      summary
     });
     await saveState();
     showToast('🏆 75 DAYS DONE. Congratulations.', 4000);
     render();
+    openCompletionModal(summary);
     return;
   }
 
@@ -960,6 +1040,150 @@ async function performCompleteDay(){
     showToast(`Day locked in. Welcome to Day ${state.currentDayIndex}.`);
   }
   render();
+}
+
+async function buildCompletionSummaryData(){
+  const dayStats = [];
+  let totalConsumed = 0, totalBurnedSum = 0, daysWithBurned = 0;
+  let totalWaterOz = 0, totalWorkouts = 0, totalMeals = 0, fullyCompliantDays = 0;
+
+  for(let d = 1; d <= TOTAL_DAYS; d++){
+    const tasks = state.days[d] || emptyTasks();
+    const meals = await loadMealsForDay(d);
+    const consumed = meals.reduce((sum, m) => sum + (m.calories || 0), 0);
+    const burned = tasks.caloriesBurned;
+    const net = burned ? (burned - consumed) : null;
+    const allDone = TASK_DEFS.every(t => tasks[t.key]) && (tasks.waterOz || 0) >= GALLON_OZ && tasks.photo;
+
+    totalConsumed += consumed;
+    totalWaterOz += (tasks.waterOz || 0);
+    totalWorkouts += (tasks.workout1 ? 1 : 0) + (tasks.workout2 ? 1 : 0);
+    totalMeals += meals.length;
+    if(allDone) fullyCompliantDays++;
+    if(burned){ totalBurnedSum += burned; daysWithBurned++; }
+
+    dayStats.push({ day: d, consumed, burned, net, allDone });
+  }
+
+  const withNet = dayStats.filter(x => x.net !== null);
+  const bestDays = withNet.slice().sort((a, b) => b.net - a.net).slice(0, 3);
+  const worstDays = withNet.slice().sort((a, b) => a.net - b.net).slice(0, 3);
+  const avgDeficit = withNet.length
+    ? Math.round(withNet.reduce((s, x) => s + x.net, 0) / withNet.length)
+    : null;
+
+  const totalWeeks = Math.ceil(TOTAL_DAYS / 7);
+  const weeks = [];
+  for(let w = 1; w <= totalWeeks; w++){
+    weeks.push(await computeWeekTotals(w));
+  }
+
+  const weightLog = await loadWeightLog();
+  const realWeights = weightLog.filter(e => !e.skipped);
+  const weightStart = realWeights.length ? realWeights[0] : null;
+  const weightEnd = realWeights.length ? realWeights[realWeights.length - 1] : null;
+  const weightDelta = (weightStart && weightEnd && weightStart.day !== weightEnd.day)
+    ? (weightEnd.weightLbs - weightStart.weightLbs)
+    : null;
+
+  return {
+    startDate: state.startDate,
+    endDate: todayISO(),
+    fullyCompliantDays,
+    totalConsumed,
+    totalBurnedSum,
+    daysWithBurned,
+    avgDeficit,
+    totalWaterOz,
+    totalWorkouts,
+    totalMeals,
+    bestDays,
+    worstDays,
+    weeks,
+    weightStart,
+    weightEnd,
+    weightDelta,
+  };
+}
+
+function renderCompletionSummaryHTML(data){
+  const gallons = (data.totalWaterOz / 128).toFixed(1);
+  const maxWorkouts = TOTAL_DAYS * 2;
+  let html = `<p class="msg" style="text-align:left; margin-bottom:6px;">${data.startDate} → ${data.endDate} · 75 days, zero excuses.</p>`;
+
+  html += `<div class="stat-grid" style="margin:10px 0 4px;">
+    <div class="macro-pill"><div class="v">${data.fullyCompliantDays}/${TOTAL_DAYS}</div><div class="l">Fully Compliant Days</div></div>
+    <div class="macro-pill"><div class="v">${data.totalWorkouts}/${maxWorkouts}</div><div class="l">Workouts Logged</div></div>
+    <div class="macro-pill"><div class="v">${gallons}</div><div class="l">Gallons of Water</div></div>
+    <div class="macro-pill"><div class="v">${data.totalMeals}</div><div class="l">Meals Logged</div></div>
+  </div>`;
+
+  html += `<div class="section-label">Calorie Totals</div>`;
+  html += `<div class="detail-row">Total consumed: ${data.totalConsumed.toLocaleString()} cal</div>`;
+  html += `<div class="detail-row">Total burned logged: ${data.totalBurnedSum.toLocaleString()} cal across ${data.daysWithBurned} day${data.daysWithBurned === 1 ? '' : 's'}</div>`;
+  if(data.avgDeficit !== null){
+    const isDeficit = data.avgDeficit >= 0;
+    const color = isDeficit ? 'var(--done)' : 'var(--danger)';
+    const label = isDeficit ? 'Avg Daily Deficit' : 'Avg Daily Surplus';
+    html += `<div class="detail-row" style="color:${color}; font-weight:600;">${label}: ${Math.abs(data.avgDeficit)} cal</div>`;
+  } else {
+    html += `<div class="detail-row">— No calories-burned days logged this run</div>`;
+  }
+
+  if(data.weightStart && data.weightEnd){
+    html += `<div class="section-label">Weight Progression</div>`;
+    html += `<div class="detail-row">Day ${data.weightStart.day}: ${data.weightStart.weightLbs.toFixed(1)} lbs → Day ${data.weightEnd.day}: ${data.weightEnd.weightLbs.toFixed(1)} lbs</div>`;
+    if(data.weightDelta !== null){
+      const dLabel = data.weightDelta > 0 ? `+${data.weightDelta.toFixed(1)}` : data.weightDelta.toFixed(1);
+      const dColor = data.weightDelta <= 0 ? 'var(--done)' : 'var(--text)';
+      html += `<div class="detail-row" style="color:${dColor}; font-weight:600;">Net change: ${dLabel} lbs</div>`;
+    }
+  }
+
+  if(data.bestDays.length || data.worstDays.length){
+    if(data.bestDays.length){
+      html += `<div class="section-label">Best Days</div>`;
+      data.bestDays.forEach(d => {
+        html += `<div class="history-item"><span>Day ${d.day}${d.allDone ? ' ✅' : ''}</span><span style="color:var(--done);">-${Math.abs(d.net)} deficit</span></div>`;
+      });
+    }
+    if(data.worstDays.length){
+      html += `<div class="section-label">Worst Days</div>`;
+      data.worstDays.forEach(d => {
+        const isSurplus = d.net < 0;
+        const color = isSurplus ? 'var(--danger)' : 'var(--done)';
+        const label = isSurplus ? `+${Math.abs(d.net)} surplus` : `-${d.net} deficit`;
+        html += `<div class="history-item"><span>Day ${d.day}${d.allDone ? ' ✅' : ''}</span><span style="color:${color};">${label}</span></div>`;
+      });
+    }
+  } else {
+    html += `<div class="section-label">Best &amp; Worst Days</div>`;
+    html += `<p class="msg">No calories-burned data was logged this run, so best/worst days can't be ranked.</p>`;
+  }
+
+  html += `<div class="section-label">Weekly Trend</div>`;
+  data.weeks.forEach(w => {
+    let right;
+    if(w.daysWithBurned === 0){
+      right = '<span class="d">No data</span>';
+    } else {
+      const isDeficit = w.netSum >= 0;
+      const color = isDeficit ? 'var(--done)' : 'var(--danger)';
+      right = `<span style="color:${color};">${(isDeficit ? '-' : '+') + Math.abs(Math.round(w.netSum))} ${isDeficit ? 'deficit' : 'surplus'}</span>`;
+    }
+    html += `<div class="history-item"><span class="d">Week ${w.weekNum} · Day ${w.weekStart}–${w.weekEnd}</span>${right}</div>`;
+  });
+
+  return html;
+}
+
+function openCompletionModal(data){
+  document.getElementById('completionBody').innerHTML = renderCompletionSummaryHTML(data);
+  document.getElementById('completionModal').classList.add('show');
+}
+
+function closeCompletionModal(){
+  document.getElementById('completionModal').classList.remove('show');
 }
 
 function openResetConfirm(){
@@ -1063,7 +1287,13 @@ function renderStats(){
       const row = document.createElement('div');
       row.className = 'history-item';
       const outcomeLabel = a.outcome === 'finished' ? 'FINISHED 75' : `Reset on Day ${a.resultDayReached}`;
-      row.innerHTML = `<span>${a.startDate} → ${a.endDate}</span><span class="d">${outcomeLabel}</span>`;
+      const summaryBtn = (a.outcome === 'finished' && a.summary)
+        ? `<button class="link-btn" data-view-summary style="margin-left:8px;">View Summary</button>`
+        : '';
+      row.innerHTML = `<span>${a.startDate} → ${a.endDate}</span><span class="d">${outcomeLabel}${summaryBtn}</span>`;
+      if(summaryBtn){
+        row.querySelector('[data-view-summary]').addEventListener('click', () => openCompletionModal(a.summary));
+      }
       list.appendChild(row);
     });
   }
@@ -1246,6 +1476,119 @@ async function renderWeeklyHistory(){
     row.innerHTML = `<span class="d">Week ${wk.weekNum} \u00b7 Day ${wk.weekStart}\u2013${wk.weekEnd}${inProgressTag}</span>${right}`;
     container.appendChild(row);
   });
+}
+
+async function buildShareSnapshot(){
+  const dayIndex = state.currentDayIndex;
+  const tasks = state.days[dayIndex] || {};
+  const meals = await loadMealsForDay(dayIndex);
+  const consumed = meals.reduce((sum, m) => sum + (m.calories || 0), 0);
+
+  const weeks = [];
+  const currentWeekNum = Math.ceil(dayIndex / 7);
+  for(let w = 1; w <= currentWeekNum; w++){
+    const wk = await computeWeekTotals(w);
+    weeks.push(wk);
+  }
+
+  const weightLog = await loadWeightLog();
+  const completedCount = Object.keys(state.completedDays).length;
+
+  return {
+    updatedAt: new Date().toISOString(),
+    currentDay: dayIndex,
+    totalDays: TOTAL_DAYS,
+    startDate: state.startDate,
+    daysCompleted: completedCount,
+    attempts: state.attempts.length + 1,
+    todayChecklist: TASK_DEFS.map(d => ({ label: d.label, done: !!tasks[d.key] })),
+    todayWater: tasks.waterOz || 0,
+    todayConsumed: consumed,
+    todayBurned: tasks.caloriesBurned || null,
+    todayMeals: meals.map(m => ({
+      time: m.time, description: m.description,
+      calories: m.calories, protein_g: m.protein_g, carbs_g: m.carbs_g, fat_g: m.fat_g,
+    })),
+    weeks: weeks.map(w => ({
+      weekNum: w.weekNum, weekStart: w.weekStart, weekEnd: w.weekEnd,
+      consumed: w.consumed, burnedSum: w.burnedSum, netSum: Math.round(w.netSum),
+      daysWithBurned: w.daysWithBurned,
+    })),
+    weightLog: weightLog.map(e => ({ day: e.day, date: e.date, weightLbs: e.weightLbs, skipped: e.skipped })),
+  };
+}
+
+async function pushShareSnapshot(){
+  if(!shareEnabled || !shareDb || !shareId) return;
+  try{
+    const snapshot = await buildShareSnapshot();
+    await shareDb.collection('shares').doc(shareId).set(snapshot);
+  }catch(e){
+    console.error('Share sync failed', e);
+  }
+}
+
+async function loadShareSettings(){
+  try{
+    const res = await window.storage.get('shareSettings');
+    if(res && res.value){
+      const parsed = JSON.parse(res.value);
+      shareId = parsed.shareId || null;
+      shareEnabled = !!parsed.enabled;
+    }
+  }catch(e){ /* no settings yet */ }
+}
+
+async function saveShareSettings(){
+  try{
+    await window.storage.set('shareSettings', JSON.stringify({ shareId, enabled: shareEnabled }));
+  }catch(e){ console.error(e); }
+}
+
+function getShareUrl(){
+  const base = window.location.href.replace(/index\.html$/, '').replace(/\/$/, '');
+  return base + '/viewer.html?id=' + shareId;
+}
+
+async function renderShareCard(){
+  const area = document.getElementById('shareStatusArea');
+  if(!area) return;
+
+  if(!isFirebaseConfigured()){
+    area.innerHTML = `<p class="msg">Firebase isn't set up yet — paste your config into the FIREBASE_CONFIG block near the top of this file's script to enable sharing.</p>`;
+    return;
+  }
+
+  if(!shareEnabled){
+    area.innerHTML = `<button class="btn btn-primary" id="enableShareBtn">Turn On Sharing</button>`;
+    document.getElementById('enableShareBtn').addEventListener('click', async () => {
+      if(!shareId) shareId = generateShareId();
+      shareEnabled = true;
+      await saveShareSettings();
+      await pushShareSnapshot();
+      renderShareCard();
+      showToast('Sharing turned on');
+    });
+  } else {
+    const url = getShareUrl();
+    area.innerHTML = `
+      <p class="msg" style="text-align:left; margin-bottom:10px;">Sharing is <b style="color:var(--done);">ON</b>. Send this link to whoever you want to see your live progress:</p>
+      <input type="text" class="suggest-input" value="${url}" readonly id="shareUrlInput" style="font-size:12px;">
+      <div class="modal-btn-row">
+        <button class="btn btn-ghost" id="copyShareUrlBtn">Copy Link</button>
+        <button class="btn btn-danger" id="disableShareBtn">Turn Off</button>
+      </div>
+    `;
+    document.getElementById('copyShareUrlBtn').addEventListener('click', () => {
+      navigator.clipboard.writeText(url).then(() => showToast('Link copied'));
+    });
+    document.getElementById('disableShareBtn').addEventListener('click', async () => {
+      shareEnabled = false;
+      await saveShareSettings();
+      renderShareCard();
+      showToast('Sharing turned off');
+    });
+  }
 }
 
 function compressImage(file, maxDim=900, quality=0.7){
@@ -2234,13 +2577,15 @@ function setupTabs(){
       if(tab.dataset.view === 'gallery') renderGallery();
       if(tab.dataset.view === 'reference') renderReference();
       if(tab.dataset.view === 'suggest') renderSuggestHistory();
-      if(tab.dataset.view === 'stats'){ renderLifetimeStats(); renderWeightLog(); renderWeeklyDeficit(); renderWeeklyHistory(); }
+      if(tab.dataset.view === 'stats'){ renderLifetimeStats(); renderWeightLog(); renderWeeklyDeficit(); renderWeeklyHistory(); renderShareCard(); }
     });
   });
 }
 
 async function init(){
   state = await loadState();
+  initShareSync();
+  await loadShareSettings();
   document.getElementById('startDateInput').value = todayISO();
   document.getElementById('startBtn').addEventListener('click', startChallenge);
   document.getElementById('completeBtn').addEventListener('click', completeDay);
@@ -2270,6 +2615,11 @@ async function init(){
   document.getElementById('dayWrapCloseX').addEventListener('click', closeDayWrapSummary);
   document.getElementById('dayWrapModal').addEventListener('click', (e) => {
     if(e.target.id === 'dayWrapModal') closeDayWrapSummary();
+  });
+  document.getElementById('completionCloseX').addEventListener('click', closeCompletionModal);
+  document.getElementById('completionCloseBtn').addEventListener('click', closeCompletionModal);
+  document.getElementById('completionModal').addEventListener('click', (e) => {
+    if(e.target.id === 'completionModal') closeCompletionModal();
   });
   document.getElementById('menuPhotoInput').addEventListener('change', handleMenuPhotoSelect);
   document.getElementById('dayDetailClose').addEventListener('click', closeDayDetail);
